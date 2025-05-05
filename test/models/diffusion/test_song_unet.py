@@ -206,6 +206,12 @@ def test_song_unet_optims(device):
     model, invar = setup_model()
     assert common.validate_combo_optims(model, (*invar,))
 
+    # Check fullgraph compilation
+    # run only on GPU - since compile is largely independent of device
+    if device == "cuda:0":
+        model, invar = setup_model()
+        assert common.validate_torch_compile(model, (*invar,), fullgraph=True)
+
 
 @pytest.mark.parametrize("device", ["cuda:0", "cpu"])
 def test_song_unet_checkpoint(device):

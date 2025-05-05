@@ -196,6 +196,50 @@ def validate_torch_fx() -> bool:
     return True
 
 
+def validate_torch_compile(
+    model: physicsnemo.Module,
+    in_args: Tuple[Tensor] = (),
+    fullgraph: bool = True,
+    backend: str = "aot_eager",  # inductor backend is too slow, and aot_eager is sufficient for the purpose of this test
+    debug: bool = False,
+) -> bool:
+    """Test that model supports fullgraph compilation, optionally print debug information about the model graph
+
+    Parameters
+    ----------
+    model : physicsnemo.Module
+        PhysicsNeMo module
+    in_args : Tuple[Tensor], optional
+        Input arguments, keywords not supported, by default ()
+    fullgraph : bool, optional
+        If true, use fullgraph compilation, otherwise use normal compilation
+    backend : str, optional
+        Backend to use for compilation, by default "aot_eager"
+    debug : bool, optional
+        If true, print debug information about the model graph using a debugging backend
+
+    Returns
+    -------
+    bool
+        True if models compiles with fullgraph, False otherwise
+    """
+    retval = True
+    torch._dynamo.reset()
+    if debug:
+        from torch._dynamo.backends.debugging import ExplainWithBackend
+
+        backend = ExplainWithBackend(backend)
+    try:
+        model = torch.compile(model, backend=backend, fullgraph=fullgraph)
+        model(*in_args)
+    except Exception as e:
+        print(e)
+        retval = False
+    if debug:
+        print(backend.output())
+    return retval
+
+
 def validate_combo_optims(
     model: physicsnemo.Module,
     in_args: Tuple[Tensor] = (),

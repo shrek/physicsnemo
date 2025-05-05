@@ -231,6 +231,14 @@ def test_GraphCast_optims(device, pytestconfig, num_channels=2, res_h=10, res_w=
     model, invar = setup_model()
     assert common.validate_combo_optims(model, (*invar,))
 
+    # Check fullgraph compilation
+    if device == "cuda:0":
+        # TODO fix graphbreaks in graphcast model, and enable fullgraph compilation
+        model, invar = setup_model()
+        assert common.validate_torch_compile(
+            model, (*invar,), fullgraph=False, debug=True
+        )
+
 
 @import_or_fail(["dgl", "transformer_engine"], [None, te_version])
 def test_GraphCast_te_optims(pytestconfig, num_channels=2, res_h=10, res_w=20):
