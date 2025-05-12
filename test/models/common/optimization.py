@@ -201,9 +201,10 @@ def validate_torch_compile(
     in_args: Tuple[Tensor] = (),
     fullgraph: bool = True,
     backend: str = "aot_eager",  # inductor backend is too slow, and aot_eager is sufficient for the purpose of this test
+    mode: str = "default",
     debug: bool = False,
 ) -> bool:
-    """Test that model supports fullgraph compilation, optionally print debug information about the model graph
+    """Test that model supports torch compilation, optionally print debug information about the model graph
 
     Parameters
     ----------
@@ -215,6 +216,8 @@ def validate_torch_compile(
         If true, use fullgraph compilation, otherwise use normal compilation
     backend : str, optional
         Backend to use for compilation, by default "aot_eager"
+    mode : str, optional
+        Mode to use for compilation, by default "default"
     debug : bool, optional
         If true, print debug information about the model graph using a debugging backend
 
@@ -230,7 +233,7 @@ def validate_torch_compile(
 
         backend = ExplainWithBackend(backend)
     try:
-        model = torch.compile(model, backend=backend, fullgraph=fullgraph)
+        model = torch.compile(model, backend=backend, fullgraph=fullgraph, mode=mode)
         model(*in_args)
     except Exception as e:
         print(e)
