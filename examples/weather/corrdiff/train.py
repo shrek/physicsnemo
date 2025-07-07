@@ -41,6 +41,7 @@ from physicsnemo.launch.utils import (
     save_checkpoint,
     get_checkpoint_dir,
 )
+from physicsnemo.compile.backend import PhysicsNemoBackend
 
 from datasets.dataset import init_train_valid_datasets_from_config, register_dataset
 from helpers.train_helpers import (
@@ -361,9 +362,29 @@ def main(cfg: DictConfig) -> None:
 
     # Compile the model and regression net if applicable
     if use_torch_compile:
-        model = torch.compile(model)
+        if cfg.training.perf.physicsnemo_compile_backend:
+            logger0.info("Using PhysicsNemo backend")
+            backend_cfg = {
+                "enable_conv_bias_fusion": True,
+                "amp_mode": enable_amp,
+            }
+            backend = PhysicsNemoBackend(backend_cfg)
+            model = torch.compile(model, backend=backend.backend())
+        else:
+            model = torch.compile(model)
         if regression_net:
-            regression_net = torch.compile(regression_net)
+            if cfg.training.perf.physicsnemo_compile_backend:
+                logger0.info("Using PhysicsNemo backend")
+                backend_cfg = {
+                    "enable_conv_bias_fusion": True,
+                    "amp_mode": enable_amp,
+                }
+                backend = PhysicsNemoBackend(backend_cfg)
+                regression_net = torch.compile(
+                    regression_net, backend=backend.backend()
+                )
+            else:
+                regression_net = torch.compile(regression_net)
 
     # Compute the number of required gradient accumulation rounds
     # It is automatically used if batch_size_per_gpu * dist.world_size < total_batch_size
