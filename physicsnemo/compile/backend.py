@@ -19,7 +19,8 @@ from typing import Any, Callable, Dict, List
 import torch
 from torch._inductor import config
 
-from physicsnemo.compile.conv_bias_op import conv_bias_fprop  # noqa: F401
+from physicsnemo.compile.conv_bias_op import conv_bias_fprop
+import physicsnemo.compile.conv_bias_op as conv_bias_op  # noqa: F401
 
 
 class PhysicsNemoBackend:
@@ -35,6 +36,7 @@ class PhysicsNemoBackend:
         cfg (Dict[str, Any]): Configuration dictionary containing backend settings
             such as enable_conv_bias_fusion and amp_mode flags.
     """
+
 
     def __init__(self, cfg: Dict[str, Any]):
         """
@@ -160,11 +162,16 @@ class PhysicsNemoBackend:
             from torch._inductor.compile_fx import compile_fx
 
             if self.cfg.get("enable_conv_bias_fusion", False):
-                if not self.cfg.get("amp_mode", False):
-                    self.replace_conv_bias_pattern(gm)
-                else:
-                    print("amp mode is enabled, skipping conv bias fusion")
+                self.replace_conv_bias_pattern(gm)
 
+            if torch.is_autocast_enabled("cuda"):
+                conv_bias_op.autocast_enabled = True
+                conv_bias_op.autocast_dtype = torch.get_autocast_dtype("cuda")
+                print("========== in backend ==========")
+                print("autocast is enabled",{torch.get_autocast_dtype("cuda")})
+            else:
+                print("========== in backend ==========")
+                print("autocast is disabled")
             # gm.print_readable()
             # graph.print_readable()
             return compile_fx(gm, inputs, config_patches=current_config)

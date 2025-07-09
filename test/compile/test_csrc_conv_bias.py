@@ -136,6 +136,41 @@ class TestConvBias(unittest.TestCase):
             self.x_.grad, self.x.grad, atol=1e-3, rtol=1e-3, equal_nan=True
         )
 
+    def test_conv_bias_amp(self):
+        """Test conv bias"""
+        weight = self.conv1.weight.to(memory_format=torch.channels_last).to(dtype=torch.bfloat16)
+        bias = (
+            self.conv1.bias.reshape(1, -1, 1, 1).to(memory_format=torch.channels_last).to(dtype=torch.bfloat16)
+        )
+        self.x = self.x.to(dtype=torch.bfloat16)
+        with torch.autocast("cuda", dtype=torch.bfloat16, enabled=True):
+            out = conv_bias.conv_bias_forward(
+                [self.x, weight, bias], self.conv_pad, self.conv_stride
+            )
+            out_ = self.conv1_(self.x_)
+            res = out[0]
+            res = res.requires_grad_(True)
+            loss = res.sum()
+        loss.backward()
+        torch.testing.assert_close(out[0], out_, atol=1e-3, rtol=1e-3, equal_nan=True)
+        torch.testing.assert_close(
+            self.conv1_.bias.grad,
+            self.conv1.bias.grad,
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
+        )
+        torch.testing.assert_close(
+            self.conv1_.weight.grad,
+            self.conv1.weight.grad,
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
+        )
+        torch.testing.assert_close(
+            self.x_.grad, self.x.grad, atol=1e-3, rtol=1e-3, equal_nan=True
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

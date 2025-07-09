@@ -31,12 +31,15 @@ git_path = shutil.which("git")
 if git_path is None:
     raise RuntimeError("git executable not found")
 
+"""
 nvcc_flags = [
     "-O3",
     "-DNDEBUG",
     "-std=c++17",
     "--generate-code=arch=compute_80,code=[sm_80]",
 ]
+"""
+nvcc_flags = []
 ld_flags = ["cuda"]
 ext_modules = []
 

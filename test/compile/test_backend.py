@@ -71,6 +71,25 @@ class TestBackend(unittest.TestCase):
         loss = actual_result.sum()
         loss.backward()
 
+    def test_backend_amp(self):
+        """Test backend"""
+        model = Conv2d(9, 9, 3).eval().to("cuda").to(memory_format=torch.channels_last)
+        example_inputs = [
+            torch.randn(1, 9, 1056, 1792, device="cuda", requires_grad=True).to(
+                memory_format=torch.channels_last
+            ),  # input
+        ]
+        self.backend_cfg = {
+            "enable_conv_bias_fusion": True,
+            "amp_mode": True,
+        }
+        backend = PhysicsNemoBackend(self.backend_cfg)
+        compiled_mod = torch.compile(model, backend=backend.backend())
+        with torch.autocast("cuda", dtype=torch.bfloat16, enabled=True):
+            actual_result = compiled_mod(*example_inputs)
+        loss = actual_result.sum()
+        loss.backward()
+
 
 if __name__ == "__main__":
     unittest.main()

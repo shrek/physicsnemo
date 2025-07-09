@@ -20,10 +20,7 @@ import sys
 import pytest
 import torch
 
-from physicsnemo.models.diffusion.unet import UNet
-
-script_path = os.path.abspath(__file__)
-sys.path.append(os.path.join(os.path.dirname(script_path), ".."))
+from physicsnemo.models.diffusion import SongUNet as UNet
 
 
 @pytest.mark.parametrize("device", ["cuda:0"])
@@ -60,8 +57,10 @@ def test_song_unet_backend(device):
 
     # Check fullgraph compilation
     # run only on GPU
-    model, invar = setup_model()
     from physicsnemo.compile.backend import PhysicsNemoBackend
+    """
+    model, invar = setup_model()
+    
 
     backend_cfg = {
         "enable_conv_bias_fusion": True,
@@ -75,6 +74,24 @@ def test_song_unet_backend(device):
     print("expected and actual results are close, Forward pass successful!")
     loss = actual_result.sum()
     loss.backward()
+    """
+    # test with amp
+    
+    model, invar = setup_model()
+    backend_cfg = {
+        "enable_conv_bias_fusion": True,
+        "amp_mode": True,
+    }
+    backend = PhysicsNemoBackend(backend_cfg)
+    compiled_mod = torch.compile(model, backend=backend.backend(), fullgraph=True)
+    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+        actual_result = compiled_mod(*invar)
+        expected_result = model(*invar)
+        torch.testing.assert_close(expected_result, actual_result, atol=0.05, rtol=1e-2)
+        print("ampexpected and actual results are close, Forward pass successful!")
+        loss = actual_result.sum()
+    loss.backward()
+    
 
 
 if __name__ == "__main__":
