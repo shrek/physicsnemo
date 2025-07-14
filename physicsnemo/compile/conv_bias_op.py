@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import conv_bias
+import physicsnemo.compile.conv_bias_py_impl as conv_bias_py_impl
 import torch
 
 
@@ -69,6 +71,10 @@ def conv_bias_fprop(
             bias = bias.to(autocast_dtype)
 
 
+    if "USE_CUDNN_PY" in os.environ:
+        out = conv_bias_py_impl.conv_bias_fprop(x, weight, bias, padding, stride)
+        return out
+        
     out = conv_bias.conv_bias_forward([x, weight, bias], padding, stride)
     return out[0]
 
@@ -150,8 +156,12 @@ def conv_bias_bprop(
         tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
             Gradients with respect to (x, weight, bias, None, None)
     """
-    grads = conv_bias.conv_bias_backward([x, weight, grad_output], padding, stride)
-    return grads[0], grads[1], grads[2].squeeze(), None, None
+    if "USE_CUDNN_BW_PY" in os.environ:
+        dgrad, wgrad, bgrad, _, _ = conv_bias_py_impl.conv_bias_bprop(x, weight, grad_output, padding, stride)
+        return dgrad, wgrad, bgrad.squeeze(), None, None
+    else:
+        grads = conv_bias.conv_bias_backward([x, weight, grad_output], padding, stride)
+        return grads[0], grads[1], grads[2].squeeze(), None, None
 
 
 @conv_bias_bprop.register_fake
