@@ -14,11 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import conv_bias
+"""
+This file contains the implementation of the conv bias fprop, bprop, wgrad, and dgrad
+functions using torch.library.custom_op.
+"""
+
 import torch
 
+import physicsnemo.compile.conv_bias_py_impl as conv_bias_py_impl
 
-@torch.library.custom_op("physicsnemo::conv_bias_fprop", mutates_args=())
+
+@torch.library.custom_op(
+    "physicsnemo::conv_bias_fprop", mutates_args=(), device_types="cuda"
+)
 def conv_bias_fprop(
     x: torch.Tensor,
     weight: torch.Tensor,
@@ -48,13 +56,14 @@ def conv_bias_fprop(
         This function automatically converts input tensors to channels_last memory format
         for optimal performance on GPU. The dilation is fixed to 1.
     """
+
     if not x.is_contiguous(memory_format=torch.channels_last):
         x = x.to(memory_format=torch.channels_last)
     if not weight.is_contiguous(memory_format=torch.channels_last):
         weight = weight.to(memory_format=torch.channels_last)
 
-    out = conv_bias.conv_bias_forward([x, weight, bias], padding, stride)
-    return out[0]
+    out = conv_bias_py_impl.conv_bias_fprop(x, weight, bias, padding, stride)
+    return out
 
 
 @conv_bias_fprop.register_fake
@@ -98,7 +107,9 @@ def _(
     return out
 
 
-@torch.library.custom_op("physicsnemo::conv_bias_bprop", mutates_args=())
+@torch.library.custom_op(
+    "physicsnemo::conv_bias_bprop", mutates_args=(), device_types="cuda"
+)
 def conv_bias_bprop(
     x: torch.Tensor,
     weight: torch.Tensor,
@@ -124,8 +135,10 @@ def conv_bias_bprop(
         tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
             Gradients with respect to (x, weight, bias, None, None)
     """
-    grads = conv_bias.conv_bias_backward([x, weight, grad_output], padding, stride)
-    return grads[0], grads[1], grads[2].squeeze(), None, None
+    dgrad, wgrad, bgrad, _, _ = conv_bias_py_impl.conv_bias_bprop(
+        x, weight, grad_output, padding, stride
+    )
+    return dgrad, wgrad, bgrad.squeeze(), None, None
 
 
 @conv_bias_bprop.register_fake
@@ -210,6 +223,7 @@ def backward(ctx, grad_output):
     #    grad_output: {grad_output.is_contiguous(memory_format=torch.channels_last)}")
     dx, dw, db, _, _ = conv_bias_bprop(x, weight, grad_output, ctx.padding, ctx.stride)
 
+    print(f"dtype of dx, dw, db: {dx.dtype}, {dw.dtype}, {db.dtype}")
     return dx, dw, db, None, None
 
 

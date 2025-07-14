@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test backend"""
+import copy
 import unittest
 
 import torch
@@ -56,20 +57,84 @@ class TestBackend(unittest.TestCase):
     def test_backend(self):
         """Test backend"""
         model = Conv2d(9, 9, 3).eval().to("cuda").to(memory_format=torch.channels_last)
-        example_inputs = [
-            torch.randn(1, 9, 1056, 1792, device="cuda", requires_grad=True).to(
-                memory_format=torch.channels_last
-            ),  # input
-        ]
+        model_ = copy.deepcopy(model)
+        model__ = copy.deepcopy(model)
+        example_input = torch.randn(
+            1, 9, 1056, 1792, device="cuda", requires_grad=True
+        ).to(
+            memory_format=torch.channels_last
+        )  # input
+        example_input_ = example_input.clone()
+        example_input__ = example_input.clone()
         self.backend_cfg = {
             "enable_conv_bias_fusion": True,
             "amp_mode": False,
         }
         backend = PhysicsNemoBackend(self.backend_cfg)
-        compiled_mod = torch.compile(model, backend=backend.backend())
-        actual_result = compiled_mod(*example_inputs)
+        custom_compiled_model = torch.compile(model, backend=backend.backend())
+        actual_result = custom_compiled_model(example_input)
         loss = actual_result.sum()
         loss.backward()
+
+        # test accurach against torch.compile
+        compiled_model = torch.compile(model_)
+        expected_result = compiled_model(example_input_)
+        loss_ = expected_result.sum()
+        loss_.backward()
+
+        torch.testing.assert_close(
+            actual_result, expected_result, atol=1e-3, rtol=1e-3, equal_nan=True
+        )
+        torch.testing.assert_close(
+            model.conv.weight.grad,
+            model_.conv.weight.grad,
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
+        )
+        torch.testing.assert_close(
+            model.conv.bias.grad,
+            model_.conv.bias.grad,
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
+        )
+        torch.testing.assert_close(
+            example_input.grad,
+            example_input_.grad,
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
+        )
+
+        # test accuracy against eager mode
+        eager_result = model__(example_input__)
+        loss__ = eager_result.sum()
+        loss__.backward()
+        torch.testing.assert_close(
+            actual_result, eager_result, atol=1e-3, rtol=1e-3, equal_nan=True
+        )
+        torch.testing.assert_close(
+            model__.conv.weight.grad,
+            model.conv.weight.grad,
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
+        )
+        torch.testing.assert_close(
+            model__.conv.bias.grad,
+            model.conv.bias.grad,
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
+        )
+        torch.testing.assert_close(
+            example_input__.grad,
+            example_input.grad,
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
+        )
 
 
 if __name__ == "__main__":

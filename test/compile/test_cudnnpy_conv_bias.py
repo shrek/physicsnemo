@@ -14,14 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test conv bias csrc"""
+"""Test conv bias using cudnnpy"""
 import copy
 import math
 import random
 import unittest
 
-import conv_bias
 import torch
+
+import physicsnemo.compile.conv_bias_py_impl as conv_bias_py_impl
 
 
 class TestConvBias(unittest.TestCase):
@@ -109,15 +110,15 @@ class TestConvBias(unittest.TestCase):
             .to(memory_format=torch.channels_last)
             .to(dtype=torch.float32)
         )
-        out = conv_bias.conv_bias_forward(
-            [self.x, weight, bias], self.conv_pad, self.conv_stride
+        out = conv_bias_py_impl.conv_bias_fprop(
+            self.x, weight, bias, self.conv_pad, self.conv_stride
         )
         out_ = self.conv1_(self.x_)
         res = out[0]
         res = res.requires_grad_(True)
         loss = res.sum()
         loss.backward()
-        torch.testing.assert_close(out[0], out_, atol=1e-3, rtol=1e-3, equal_nan=True)
+        torch.testing.assert_close(out, out_, atol=1e-3, rtol=1e-3, equal_nan=True)
         torch.testing.assert_close(
             self.conv1_.bias.grad,
             self.conv1.bias.grad,

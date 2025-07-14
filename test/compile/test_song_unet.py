@@ -14,16 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test song unet with custom backend"""
-import os
-import sys
 
 import pytest
 import torch
 
-from physicsnemo.models.diffusion.unet import UNet
-
-script_path = os.path.abspath(__file__)
-sys.path.append(os.path.join(os.path.dirname(script_path), ".."))
+from physicsnemo.models.diffusion import SongUNet as UNet
 
 
 @pytest.mark.parametrize("device", ["cuda:0"])
@@ -60,8 +55,9 @@ def test_song_unet_backend(device):
 
     # Check fullgraph compilation
     # run only on GPU
-    model, invar = setup_model()
     from physicsnemo.compile.backend import PhysicsNemoBackend
+
+    model, invar = setup_model()
 
     backend_cfg = {
         "enable_conv_bias_fusion": True,
