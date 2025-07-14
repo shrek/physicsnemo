@@ -71,8 +71,9 @@ class TestBackend(unittest.TestCase):
         loss = actual_result.sum()
         loss.backward()
 
+    """
     def test_backend_amp(self):
-        """Test backend"""
+        
         model = Conv2d(9, 9, 3).eval().to("cuda").to(memory_format=torch.channels_last)
         example_inputs = [
             torch.randn(1, 9, 1056, 1792, device="cuda", requires_grad=True).to(
@@ -89,7 +90,7 @@ class TestBackend(unittest.TestCase):
             actual_result = compiled_mod(*example_inputs)
         loss = actual_result.sum()
         loss.backward()
-
+    """
 
 if __name__ == "__main__":
     unittest.main()

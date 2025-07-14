@@ -64,14 +64,12 @@ def create_conv_bias_fprop_graph(X_gpu, W_gpu, B_gpu, padding, stride):
 
     return graph, [X, W, B, Y]
 
-def get_conv_bias_bgrad_cache_key(ygrad_gpu, bias_gpu):
+def get_conv_bias_bgrad_cache_key(ygrad_gpu, bias_shape):
     return (
         tuple(ygrad_gpu.shape),
         tuple(ygrad_gpu.stride()),
-        tuple(bias_gpu.shape),
-        tuple(bias_gpu.stride()),
+        tuple(bias_shape),
         ygrad_gpu.dtype,
-        bias_gpu.dtype,
         "bgrad",
     )
 
@@ -91,7 +89,7 @@ def create_conv_bias_bgrad_graph(ygrad_gpu, bias_shape):
         name="Y_GRAD", dim=ygrad_gpu.size(), stride=ygrad_gpu.stride(), data_type=ygrad_gpu.dtype
     )
     bgrad_output = graph.reduction(
-        name="B_GRAD", input=Y_GRAD, reduction_op=cudnn.reduction_op.ADD
+        name="B_GRAD", input=Y_GRAD, mode=cudnn.reduction_mode.ADD
     )
     bgrad_output.set_output(True).set_dim(bias_shape).set_data_type(ygrad_gpu.dtype)
     return graph, [Y_GRAD, bgrad_output]
@@ -118,6 +116,8 @@ def create_conv_bias_wgrad_graph(X_gpu, W_grad_gpu, Y_grad_gpu, padding, stride)
     io_data_type = cudnn.data_type.FLOAT
     intermediate_data_type = cudnn.data_type.FLOAT
     compute_data_type = cudnn.data_type.FLOAT
+    padding = [padding, padding]
+    stride = [stride, stride]
     dilation = [1, 1]
     
     graph = cudnn.pygraph(
@@ -151,7 +151,6 @@ def get_conv_bias_dgrad_cache_key(X_gpu, W_gpu, Y_grad_gpu, padding, stride):
         tuple(W_gpu.stride()),
         tuple(Y_grad_gpu.shape),
         tuple(Y_grad_gpu.stride()),
-        X_gpu.dtype,
         W_gpu.dtype,
         Y_grad_gpu.dtype,
         padding,
@@ -165,6 +164,8 @@ def create_conv_bias_dgrad_graph(X_gpu, W_gpu, Y_grad_gpu, padding, stride):
     io_data_type = cudnn.data_type.FLOAT
     intermediate_data_type = cudnn.data_type.FLOAT
     compute_data_type = cudnn.data_type.FLOAT
+    padding = [padding, padding]
+    stride = [stride, stride]
     dilation = [1, 1]
     
     graph = cudnn.pygraph(
@@ -172,9 +173,6 @@ def create_conv_bias_dgrad_graph(X_gpu, W_gpu, Y_grad_gpu, padding, stride):
         intermediate_data_type=intermediate_data_type,
         compute_data_type=compute_data_type,
         handle=cudnn_handle
-    )
-    X = graph.tensor(
-        name="X", dim=X_gpu.size(), stride=X_gpu.stride(), data_type=X_gpu.dtype
     )
     W = graph.tensor(
         name="W", dim=W_gpu.size(), stride=W_gpu.stride(), data_type=W_gpu.dtype
@@ -184,15 +182,14 @@ def create_conv_bias_dgrad_graph(X_gpu, W_gpu, Y_grad_gpu, padding, stride):
     )
     dgrad_output = graph.conv_dgrad(
         name="dgrad",
-        image=X,
-        weight=W,
         loss=Y_GRAD,
+        filter=W,
         padding=padding,
         stride=stride,
         dilation=dilation,
     )
     dgrad_output.set_output(True).set_dim(X_gpu.size()).set_data_type(X_gpu.dtype).set_stride(X_gpu.stride())
-    return graph, [X, W, Y_GRAD, dgrad_output]
+    return graph, [W, Y_GRAD, dgrad_output]
 
 
 class CudnnGraphManager:
@@ -224,10 +221,10 @@ class CudnnGraphManager:
             raise KeyError(f"Graph uids not found for key: {key}. Available keys: {list(self.graph_uids[graph_type].keys())}")
         return self.graph_uids[graph_type][key]
     
-    def create_or_get_conv_bias_bgrad_graph(self, ygrad_gpu, bias_gpu):
-        key = get_conv_bias_bgrad_cache_key(ygrad_gpu, bias_gpu)
+    def create_or_get_conv_bias_bgrad_graph(self, ygrad_gpu, bias_shape):
+        key = get_conv_bias_bgrad_cache_key(ygrad_gpu, bias_shape)
         if key not in self.graphs["bgrad"]:
-            graph, uids = create_conv_bias_bgrad_graph(ygrad_gpu, bias_gpu)
+            graph, uids = create_conv_bias_bgrad_graph(ygrad_gpu, bias_shape)
             self.graphs["bgrad"][key] = graph
             self.graph_uids["bgrad"][key] = uids
         return self.graphs["bgrad"][key], self.graph_uids["bgrad"][key]
@@ -292,13 +289,14 @@ def execute_wgrad(graph, uids, x_gpu, wgrad_gpu, ygrad_gpu, workspace):
         {X: x_gpu, Y_GRAD: ygrad_gpu, W_GRAD: wgrad_gpu}, workspace, handle=cudnn_handle
     )
 
-def execute_dgrad(graph, uids, x_gpu, w_gpu, ygrad_gpu, dgrad_gpu, workspace):
-    X, W, Y_GRAD, D_GRAD = uids
+def execute_dgrad(graph, uids, w_gpu, ygrad_gpu, dgrad_gpu, workspace):
+    W, Y_GRAD, D_GRAD = uids
     graph.execute(
-        {X: x_gpu, W: w_gpu, Y_GRAD: ygrad_gpu, D_GRAD: dgrad_gpu}, workspace, handle=cudnn_handle
+        {W: w_gpu, Y_GRAD: ygrad_gpu, D_GRAD: dgrad_gpu}, workspace, handle=cudnn_handle
     )
 
 def conv_bias_fprop(x, weight, bias, padding, stride):
+    print("========== using cudnnpy for fprop ==========")
     # Ensure bias is properly shaped for cuDNN (NCHW format)
     bias_v = bias.view(1, -1, 1, 1)
     # Use consistent key generation (without memory format conversion)
@@ -317,10 +315,11 @@ def conv_bias_fprop(x, weight, bias, padding, stride):
 
 
 def conv_bias_bprop(x, weight, grad_output, padding, stride):
-    bias_dim = (1, grad_output.shape[1], 1, 1)
-    bgrad_graph, bgrad_uids = cudnn_graph_manager.create_or_get_conv_bias_bgrad_graph(grad_output, bias_v)
+    print("========== using cudnnpy for bprop ==========")
+    bias_shape = (1, grad_output.shape[1], 1, 1)
+    bgrad_graph, bgrad_uids = cudnn_graph_manager.create_or_get_conv_bias_bgrad_graph(grad_output, bias_shape)
     bgrad_workspace = torch.empty(bgrad_graph.get_workspace_size(), device="cuda", dtype=torch.uint8)
-    bgrad_output = torch.empty(bias_dim, device="cuda", dtype=bias_v.dtype, memory_format=torch.channels_last)
+    bgrad_output = torch.empty(bias_shape, device="cuda", dtype=grad_output.dtype, memory_format=torch.channels_last)
     execute_bgrad(bgrad_graph, bgrad_uids, grad_output, bgrad_output, bgrad_workspace)
     bgrad_workspace = None
 
@@ -333,7 +332,7 @@ def conv_bias_bprop(x, weight, grad_output, padding, stride):
     dgrad_graph, dgrad_uids = cudnn_graph_manager.create_or_get_conv_bias_dgrad_graph(x, weight, grad_output, padding, stride)
     dgrad_workspace = torch.empty(dgrad_graph.get_workspace_size(), device="cuda", dtype=torch.uint8)
     dgrad_output = torch.empty_like(x)
-    execute_dgrad(dgrad_graph, dgrad_uids, x, weight, grad_output, dgrad_output, dgrad_workspace)
+    execute_dgrad(dgrad_graph, dgrad_uids, weight, grad_output, dgrad_output, dgrad_workspace)
     dgrad_workspace = None
     
     return dgrad_output, wgrad_output, bgrad_output, None, None

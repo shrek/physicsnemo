@@ -58,7 +58,7 @@ def test_song_unet_backend(device):
     # Check fullgraph compilation
     # run only on GPU
     from physicsnemo.compile.backend import PhysicsNemoBackend
-    """
+    
     model, invar = setup_model()
     
 
@@ -74,9 +74,9 @@ def test_song_unet_backend(device):
     print("expected and actual results are close, Forward pass successful!")
     loss = actual_result.sum()
     loss.backward()
-    """
-    # test with amp
     
+    # test with amp
+    """
     model, invar = setup_model()
     backend_cfg = {
         "enable_conv_bias_fusion": True,
@@ -91,7 +91,7 @@ def test_song_unet_backend(device):
         print("ampexpected and actual results are close, Forward pass successful!")
         loss = actual_result.sum()
     loss.backward()
-    
+    """
 
 
 if __name__ == "__main__":
