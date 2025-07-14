@@ -164,14 +164,6 @@ class PhysicsNemoBackend:
             if self.cfg.get("enable_conv_bias_fusion", False):
                 self.replace_conv_bias_pattern(gm)
 
-            if torch.is_autocast_enabled("cuda"):
-                conv_bias_op.autocast_enabled = True
-                conv_bias_op.autocast_dtype = torch.get_autocast_dtype("cuda")
-                print("========== in backend ==========")
-                print("autocast is enabled",{torch.get_autocast_dtype("cuda")})
-            else:
-                print("========== in backend ==========")
-                print("autocast is disabled")
             # gm.print_readable()
             # graph.print_readable()
             return compile_fx(gm, inputs, config_patches=current_config)

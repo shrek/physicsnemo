@@ -74,25 +74,6 @@ def test_song_unet_backend(device):
     print("expected and actual results are close, Forward pass successful!")
     loss = actual_result.sum()
     loss.backward()
-    
-    # test with amp
-    """
-    model, invar = setup_model()
-    backend_cfg = {
-        "enable_conv_bias_fusion": True,
-        "amp_mode": True,
-    }
-    backend = PhysicsNemoBackend(backend_cfg)
-    compiled_mod = torch.compile(model, backend=backend.backend(), fullgraph=True)
-    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-        actual_result = compiled_mod(*invar)
-        expected_result = model(*invar)
-        torch.testing.assert_close(expected_result, actual_result, atol=0.05, rtol=1e-2)
-        print("ampexpected and actual results are close, Forward pass successful!")
-        loss = actual_result.sum()
-    loss.backward()
-    """
-
 
 if __name__ == "__main__":
     test_song_unet_backend(device="cuda:0")

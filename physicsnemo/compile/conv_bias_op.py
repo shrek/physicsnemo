@@ -19,10 +19,6 @@ import physicsnemo.compile.conv_bias_py_impl as conv_bias_py_impl
 import torch
 
 
-
-autocast_dtype = None
-autocast_enabled = False
-
 @torch.library.custom_op("physicsnemo::conv_bias_fprop", mutates_args=(), device_types="cuda")
 def conv_bias_fprop(
     x: torch.Tensor,
@@ -54,20 +50,10 @@ def conv_bias_fprop(
         for optimal performance on GPU. The dilation is fixed to 1.
     """
 
-    global autocast_dtype, autocast_enabled
-
     if not x.is_contiguous(memory_format=torch.channels_last):
         x = x.to(memory_format=torch.channels_last)
     if not weight.is_contiguous(memory_format=torch.channels_last):
         weight = weight.to(memory_format=torch.channels_last)
-
-    if autocast_enabled:
-        if x.dtype != autocast_dtype:
-            x = x.to(autocast_dtype)
-        if weight.dtype != autocast_dtype:
-            weight = weight.to(autocast_dtype)        
-        if bias.dtype != autocast_dtype:
-            bias = bias.to(autocast_dtype)
 
     out = conv_bias_py_impl.conv_bias_fprop(x, weight, bias, padding, stride)
     return out
@@ -96,8 +82,6 @@ def _(
     Returns:
         torch.Tensor: Output tensor computed using standard conv2d
     """
-    global autocast_dtype, autocast_enabled
-
     # sanity check
     # print("========== in register_fake for fprop ==========")
     # print(f"x: {x.shape}, weight: {weight.shape}, bias: {bias.shape}")
@@ -110,14 +94,6 @@ def _(
     if not weight.is_contiguous(memory_format=torch.channels_last):
         # print("---converting weight to channels last---")
         weight = weight.to(memory_format=torch.channels_last)
-
-    if autocast_enabled:
-        if x.dtype != autocast_dtype:
-            x = x.to(autocast_dtype)
-        if weight.dtype != autocast_dtype:
-            weight = weight.to(autocast_dtype)        
-        if bias.dtype != autocast_dtype:
-            bias = bias.to(autocast_dtype)
 
     # print(f"x: {x.is_contiguous(memory_format=torch.channels_last)}, weight: {weight.is_contiguous(memory_format=torch.channels_last)}")
     out = torch.nn.functional.conv2d(
@@ -186,15 +162,6 @@ def _(
     # print(f"grad_output: {grad_output.shape}, x: {x.shape}, weight: {weight.shape}")
     # print(f"grad_output: {grad_output.dtype}, x: {x.dtype}, weight: {weight.dtype}")
 
-    global autocast_dtype, autocast_enabled
-    if autocast_enabled:
-        if x.dtype != autocast_dtype:
-            x = x.to(autocast_dtype)
-        if weight.dtype != autocast_dtype:
-            weight = weight.to(autocast_dtype)        
-        if grad_output.dtype != autocast_dtype:
-            grad_output = grad_output.to(autocast_dtype) 
-
     sum = torch.sum(grad_output, dim=[0, 2, 3])
     x_grad = torch.zeros_like(x)
     weight_grad = torch.zeros_like(weight)
@@ -236,15 +203,6 @@ def backward(ctx, grad_output):
     x, weight = ctx.saved_tensors
     # print(f"x: {x.is_contiguous(memory_format=torch.channels_last)}, weight: {weight.is_contiguous(memory_format=torch.channels_last)}, \
     #      grad_output: {grad_output.is_contiguous(memory_format=torch.channels_last)}")
-    global autocast_dtype, autocast_enabled
-    if autocast_enabled:
-        if x.dtype != autocast_dtype:
-            x = x.to(autocast_dtype)
-        if weight.dtype != autocast_dtype:
-            weight = weight.to(autocast_dtype)        
-        if grad_output.dtype != autocast_dtype:
-            grad_output = grad_output.to(autocast_dtype) 
-
 
     if not x.is_contiguous(memory_format=torch.channels_last):
         x = x.to(memory_format=torch.channels_last)
