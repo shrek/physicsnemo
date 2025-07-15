@@ -26,6 +26,15 @@ from physicsnemo.models.diffusion import SongUNet as UNet
 def test_song_unet_backend(device):
     """Test song unet with custom backend"""
 
+    def compare_conv2d_gradients(model1, model2):
+        for (name1, param1), (name2, param2) in zip(
+            model1.named_parameters(), model2.named_parameters()
+        ):
+            # print(f"checking {name1}")
+            if param1.grad is None or param2.grad is None:
+                continue
+            torch.testing.assert_close(param1.grad, param2.grad, atol=0.05, rtol=1e-2)
+
     def setup_model():
         """Setup the model for testing"""
         model = (
@@ -80,7 +89,8 @@ def test_song_unet_backend(device):
     loss_.backward()
 
     torch.testing.assert_close(invar[0].grad, invar_[0].grad, atol=0.05, rtol=1e-2)
-    print("expected and actual input gradients are close, Backward pass successful!")
+    compare_conv2d_gradients(model, model_)
+    print("expected and actual gradients are close, Backward pass successful!")
 
 
 if __name__ == "__main__":
