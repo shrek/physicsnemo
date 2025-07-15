@@ -77,7 +77,7 @@ class PhysicsNemoBackend:
         Returns:
             torch.fx.Graph: The modified graph with fused convolution operations.
         """
-        print("total graph nodes: ", len(graph.nodes))
+        # print("total graph nodes: ", len(graph.nodes))
         conv2dnodes = [n for n in graph.nodes if n.target == torch.conv2d]
         # print(f"conv2dnodes: {len(conv2dnodes)}")
         replaced_nodes = []
@@ -103,7 +103,7 @@ class PhysicsNemoBackend:
                 replaced_nodes.append(node)
         for node in replaced_nodes:
             graph.erase_node(node)
-        print("replaced nodes: ", len(replaced_nodes))
+        # print("replaced nodes: ", len(replaced_nodes))
         return graph
 
     def replace_conv_bias_pattern(self, gm: torch.fx.GraphModule):
@@ -156,11 +156,12 @@ class PhysicsNemoBackend:
                     input signature as the original model, but with optimizations
                     applied for improved performance.
             """
-            current_config = config.shallow_copy_dict()
+            current_config = config.get_config_copy()
             from torch._inductor.compile_fx import compile_fx
 
             if self.cfg.get("enable_conv_bias_fusion", False):
                 if not self.cfg.get("amp_mode", False):
+                    print("Using custom backend for conv bias fusion")
                     self.replace_conv_bias_pattern(gm)
                 else:
                     print("amp mode is enabled, skipping conv bias fusion")

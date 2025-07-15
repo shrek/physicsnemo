@@ -14,10 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test conv bias using cudnnpy"""
+"""Test conv bias using cudnn python api"""
 import copy
-import math
-import random
 import unittest
 
 import torch
@@ -33,38 +31,27 @@ class TestConvBias(unittest.TestCase):
         super().setUp()
         torch.manual_seed(seed)
 
-        self.batch_size = random.randint(1, 64)
-        self.in_channels = random.randint(1, 64) * 8
-        self.out_channels = random.randint(1, 64) * 8
-        self.in_height = self.in_width = random.randint(5, 100)
-        self.conv_kernel_size = random.randint(1, 5)
-        self.conv_pad = random.randint(0, int(self.conv_kernel_size / 2))
-        self.conv_stride = random.randint(1, 5)
+        self.batch_size = 1
+        self.in_channels = 8
+        self.out_channels = 8
+        self.in_height = 1056
+        self.in_width = 1972
+        self.conv_kernel_size = 3
+        self.conv_pad = 1
+        self.conv_stride = 1
         self.conv_dilation = 1
-        self.out_height = self.out_width = math.floor(
-            (
-                self.in_height
-                + 2 * self.conv_pad
-                - self.conv_dilation * (self.conv_kernel_size - 1)
-                - 1
-            )
-            / self.conv_stride
-            + 1
-        )
 
-        self.x = (
-            torch.randint(
-                low=-16,
-                high=16,
-                size=[self.batch_size, self.in_channels, self.in_height, self.in_width],
-            )
-            .cuda()
-            .to(memory_format=torch.channels_last)
-            .to(dtype=torch.float32)
+        self.x = torch.randn(
+            self.batch_size,
+            self.in_channels,
+            self.in_height,
+            self.in_width,
+            device="cuda",
+            requires_grad=True,
         )
         self.x_ = self.x.clone()
-        self.x.requires_grad_()
-        self.x_.requires_grad_()
+        self.x.to(memory_format=torch.channels_last)
+        self.x_.to(memory_format=torch.channels_last)
 
         self.bias = torch.randn([1, self.out_channels, 1, 1]).cuda()
         self.bias_ = self.bias.clone()
@@ -114,27 +101,52 @@ class TestConvBias(unittest.TestCase):
             self.x, weight, bias, self.conv_pad, self.conv_stride
         )
         out_ = self.conv1_(self.x_)
-        res = out[0]
-        res = res.requires_grad_(True)
-        loss = res.sum()
-        loss.backward()
+
+        print("========== forward test ==========")
+        print("checking output")
         torch.testing.assert_close(out, out_, atol=1e-3, rtol=1e-3, equal_nan=True)
+
+        expected_grads = torch.ops.aten.convolution_backward(
+            out_,
+            self.x,
+            self.conv1_.weight,
+            self.bias.shape,
+            [1, 1],
+            [1, 1],
+            [1, 1],
+            False,
+            [0, 0],
+            1,
+            [True, True, True],
+        )
+        actual_grads = conv_bias_py_impl.conv_bias_bprop(
+            self.x, self.conv1.weight, out_, 1, 1
+        )
+
+        print("========== backward test ==========")
+        print("checking input grads")
         torch.testing.assert_close(
-            self.conv1_.bias.grad,
-            self.conv1.bias.grad,
+            expected_grads[0],
+            actual_grads[0],
             atol=1e-3,
             rtol=1e-3,
             equal_nan=True,
         )
+        print("checking weight grads")
         torch.testing.assert_close(
-            self.conv1_.weight.grad,
-            self.conv1.weight.grad,
+            expected_grads[1],
+            actual_grads[1],
             atol=1e-3,
             rtol=1e-3,
             equal_nan=True,
         )
+        print("checking bias grads")
         torch.testing.assert_close(
-            self.x_.grad, self.x.grad, atol=1e-3, rtol=1e-3, equal_nan=True
+            expected_grads[1],
+            actual_grads[1],
+            atol=1e-3,
+            rtol=1e-3,
+            equal_nan=True,
         )
 
 

@@ -59,13 +59,13 @@ class TestBackend(unittest.TestCase):
         model = Conv2d(9, 9, 3).eval().to("cuda").to(memory_format=torch.channels_last)
         model_ = copy.deepcopy(model)
         model__ = copy.deepcopy(model)
-        example_input = torch.randn(
-            1, 9, 1056, 1792, device="cuda", requires_grad=True
-        ).to(
-            memory_format=torch.channels_last
-        )  # input
-        example_input_ = example_input.clone()
-        example_input__ = example_input.clone()
+        example_input = torch.randn(1, 9, 1056, 1792, device="cuda", requires_grad=True)
+        example_input_ = copy.deepcopy(example_input)
+        example_input__ = copy.deepcopy(example_input)
+        example_input.to(memory_format=torch.channels_last)
+        example_input_.to(memory_format=torch.channels_last)
+        example_input__.to(memory_format=torch.channels_last)
+
         self.backend_cfg = {
             "enable_conv_bias_fusion": True,
             "amp_mode": False,
@@ -82,9 +82,12 @@ class TestBackend(unittest.TestCase):
         loss_ = expected_result.sum()
         loss_.backward()
 
+        print("checking against torch.compile")
+        print("...checking output")
         torch.testing.assert_close(
             actual_result, expected_result, atol=1e-3, rtol=1e-3, equal_nan=True
         )
+        print("...checking weight grads")
         torch.testing.assert_close(
             model.conv.weight.grad,
             model_.conv.weight.grad,
@@ -92,6 +95,7 @@ class TestBackend(unittest.TestCase):
             rtol=1e-3,
             equal_nan=True,
         )
+        print("...checking bias grads")
         torch.testing.assert_close(
             model.conv.bias.grad,
             model_.conv.bias.grad,
@@ -99,6 +103,7 @@ class TestBackend(unittest.TestCase):
             rtol=1e-3,
             equal_nan=True,
         )
+        print("...checking input grads")
         torch.testing.assert_close(
             example_input.grad,
             example_input_.grad,
@@ -108,12 +113,15 @@ class TestBackend(unittest.TestCase):
         )
 
         # test accuracy against eager mode
+        print("checking against eager mode")
+        print("...checking output")
         eager_result = model__(example_input__)
         loss__ = eager_result.sum()
         loss__.backward()
         torch.testing.assert_close(
             actual_result, eager_result, atol=1e-3, rtol=1e-3, equal_nan=True
         )
+        print("...checking weight grads")
         torch.testing.assert_close(
             model__.conv.weight.grad,
             model.conv.weight.grad,
@@ -121,6 +129,7 @@ class TestBackend(unittest.TestCase):
             rtol=1e-3,
             equal_nan=True,
         )
+        print("...checking bias grads")
         torch.testing.assert_close(
             model__.conv.bias.grad,
             model.conv.bias.grad,
@@ -128,6 +137,7 @@ class TestBackend(unittest.TestCase):
             rtol=1e-3,
             equal_nan=True,
         )
+        print("...checking input grads")
         torch.testing.assert_close(
             example_input__.grad,
             example_input.grad,

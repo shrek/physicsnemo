@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test song unet with custom backend"""
+import copy
 
 import pytest
 import torch
@@ -45,7 +46,7 @@ def test_song_unet_backend(device):
         noise_labels = torch.randn([1]).to(device).to(dtype=torch.float32)
         class_labels = torch.randint(0, 1, (1, 1)).to(device).to(dtype=torch.float32)
         input_image = (
-            torch.ones([1, 2, 448, 448])
+            torch.randn([1, 2, 448, 448])
             .to(device)
             .to(dtype=torch.float32)
             .to(memory_format=torch.channels_last)
@@ -58,6 +59,8 @@ def test_song_unet_backend(device):
     from physicsnemo.compile.backend import PhysicsNemoBackend
 
     model, invar = setup_model()
+    model_ = copy.deepcopy(model)
+    invar_ = copy.deepcopy(invar)
 
     backend_cfg = {
         "enable_conv_bias_fusion": True,
@@ -66,11 +69,18 @@ def test_song_unet_backend(device):
     backend = PhysicsNemoBackend(backend_cfg)
     compiled_mod = torch.compile(model, backend=backend.backend(), fullgraph=True)
     actual_result = compiled_mod(*invar)
-    expected_result = model(*invar)
+    expected_result = model_(*invar_)
     torch.testing.assert_close(expected_result, actual_result, atol=0.05, rtol=1e-2)
     print("expected and actual results are close, Forward pass successful!")
+
     loss = actual_result.sum()
     loss.backward()
+
+    loss_ = expected_result.sum()
+    loss_.backward()
+
+    torch.testing.assert_close(invar[0].grad, invar_[0].grad, atol=0.05, rtol=1e-2)
+    print("expected and actual input gradients are close, Backward pass successful!")
 
 
 if __name__ == "__main__":

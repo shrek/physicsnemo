@@ -223,7 +223,7 @@ def backward(ctx, grad_output):
     #    grad_output: {grad_output.is_contiguous(memory_format=torch.channels_last)}")
     dx, dw, db, _, _ = conv_bias_bprop(x, weight, grad_output, ctx.padding, ctx.stride)
 
-    print(f"dtype of dx, dw, db: {dx.dtype}, {dw.dtype}, {db.dtype}")
+    # print(f"dtype of dx, dw, db: {dx.dtype}, {dw.dtype}, {db.dtype}")
     return dx, dw, db, None, None
 
 

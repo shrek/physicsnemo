@@ -392,10 +392,10 @@ def execute_dgrad(graph, uids, w_gpu, ygrad_gpu, dgrad_gpu, workspace):
 
 def conv_bias_fprop(x, weight, bias, padding, stride):
     """Perform forward propagation for conv bias operation using cuDNN."""
-    print("========== using cudnnpy for fprop ==========")
+    # print("========== using cudnnpy for fprop ==========")
     bias_v = bias.view(1, -1, 1, 1)
     output_shape = get_output_buffer_shape(x, weight, bias, padding, stride)
-    print(f"output_shape: {output_shape}")
+    # print(f"output_shape: {output_shape}")
     Y_actual = torch.empty(
         output_shape, device="cuda", dtype=x.dtype, memory_format=torch.channels_last
     )
@@ -415,7 +415,7 @@ def conv_bias_fprop(x, weight, bias, padding, stride):
 
 def conv_bias_bprop(x, weight, grad_output, padding, stride):
     """Perform backward propagation for conv bias operation using cuDNN."""
-    print("========== using cudnnpy for bprop ==========")
+    # print("========== using cudnnpy for bprop ==========")
     bias_shape = (1, grad_output.shape[1], 1, 1)
     bgrad_graph, bgrad_uids = cudnn_graph_manager.create_or_get_conv_bias_bgrad_graph(
         grad_output, bias_shape
