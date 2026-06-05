@@ -357,6 +357,7 @@ class GeoTransolver(Module):
         attention_type: str = "GALE",
         concrete_dropout: bool = False,
         state_mixing_mode: str = "weighted",
+        reuse_context_local_features: bool = False,
     ) -> None:
         super().__init__(meta=GeoTransolverMetaData())
         self.__name__ = "GeoTransolver"
@@ -400,6 +401,7 @@ class GeoTransolver(Module):
             plus=plus,
             include_local_features=self.include_local_features,
             concrete_dropout=concrete_dropout,
+            reuse_context_local_features=reuse_context_local_features,
         )
         context_dim = self.context_builder.get_context_dim()
 

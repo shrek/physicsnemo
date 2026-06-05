@@ -46,6 +46,7 @@ from typing import Any, Literal, TypeAlias, cast
 import hydra
 import omegaconf
 import torch
+from torch.profiler import record_function
 from collate import build_collate_fn
 from datasets import (
     ManifestSampler,
@@ -83,10 +84,13 @@ TE_AVAILABLE = te.available
 
 _LOGGER = logging.getLogger("training.build_dataloaders")
 
-### When `cfg.profile` is set, every train / val epoch breaks out of its
-### batch loop after this many steps. Keeps profiling traces short enough
-### to be useful without changing the rest of the training contract.
-_PROFILE_MAX_STEPS = 10
+### Profiling captures a short training window in the second human-visible
+### epoch (zero-based index 1). One warmup step keeps the recorded five-step
+### torch profiler trace focused on steady-state work.
+_PROFILE_START_EPOCH = 1
+_PROFILE_WARMUP_STEPS = 1
+_PROFILE_ACTIVE_STEPS = 5
+_PROFILE_TOTAL_STEPS = _PROFILE_WARMUP_STEPS + _PROFILE_ACTIVE_STEPS
 
 ### Allowed mixed-precision modes for the autocast context. Validated only
 ### structurally (via the type), not at runtime: an unknown value falls
@@ -302,17 +306,20 @@ def forward_pass(
     targets: TensorDict = batch["targets"]
 
     ### Inputs keep their native dtype; autocast handles model-internal precision.
-    with get_autocast_context(precision):
+    with record_function("train.forward.model"), get_autocast_context(precision):
         output = model(**forward_kwargs)
 
-    pred_td = normalize_output_to_tensordict(output, target_config, output_type)
+    with record_function("train.forward.normalize_output"):
+        pred_td = normalize_output_to_tensordict(output, target_config, output_type)
 
     ### Loss runs in float32 to avoid bf16 precision loss in the reduction.
-    pred_f32 = pred_td.float()
-    target_f32 = targets.float()
+    with record_function("train.forward.cast_targets"):
+        pred_f32 = pred_td.float()
+        target_f32 = targets.float()
 
-    loss, loss_td = loss_calculator(pred_f32, target_f32)
-    with torch.no_grad():
+    with record_function("train.forward.loss"):
+        loss, loss_td = loss_calculator(pred_f32, target_f32)
+    with record_function("train.forward.metrics"), torch.no_grad():
         metric_td = metric_calculator(pred_f32, target_f32)
     ### Detach (don't sync) the per-field TDs so the caller controls when
     ### a D2H copy happens; running ``.item()`` here would serialise the
@@ -339,17 +346,15 @@ def _run_epoch(
     scaler: GradScaler | None = None,
     writer: SummaryWriter | None = None,
     log_jsonl: Callable[[dict[str, Any]], None] | None = None,
+    profile_steps: bool = False,
 ) -> tuple[float, dict[str, float]]:
     """Run one training-or-validation epoch.
 
     Train and val share the same per-batch loop (``forward_pass`` +
     metric accumulation + per-step console log + per-epoch summary).
     Train mode additionally runs the backward / optimizer / scheduler
-    step and emits per-step TensorBoard + JSONL entries (``phase: "step"``);
-    val mode wraps the loop in ``torch.no_grad()``, skips TensorBoard
-    per-step logging, and emits a lighter-weight JSONL record per step
-    (``phase: "val_step"``) carrying ``epoch``, ``val_step``, ``loss``
-    and ``step_time_s``.
+    step and emits per-step TensorBoard + JSONL entries; val mode wraps
+    the loop in ``torch.no_grad()`` and skips the per-step writer logging.
 
     Args:
         mode: ``"train"`` or ``"val"``. ``"train"`` requires *optimizer*
@@ -359,6 +364,8 @@ def _run_epoch(
             metrics are written to it on rank 0; per-step metrics are
             written only in train mode.
         log_jsonl: Optional ``record -> None`` callback for JSONL logs.
+        profile_steps: Advance the torch profiler step counter and stop
+            after the configured short profiling window.
             See ``forward_pass`` and ``main`` docstrings for the rest of
             the parameters.
     """
@@ -389,30 +396,46 @@ def _run_epoch(
 
     with grad_ctx:
         step_t0 = time.perf_counter()
-        for i, batch in enumerate(dataloader):
-            batch = _recursive_to_device(batch, dist_manager.device)
+        dataloader_iter = iter(dataloader)
+        for i in range(num_steps):
+            with record_function(f"train.{mode}.dataload"):
+                try:
+                    batch = next(dataloader_iter)
+                except StopIteration:
+                    break
 
-            loss, losses, metrics = forward_pass(
-                batch,
-                model,
-                precision,
-                loss_calculator,
-                metric_calculator,
-                output_type=output_type,
-                target_config=target_config,
-            )
+            with record_function("train.batch.to_device"):
+                batch = _recursive_to_device(batch, dist_manager.device)
+
+            with record_function(f"train.{mode}.forward_pass"):
+                loss, losses, metrics = forward_pass(
+                    batch,
+                    model,
+                    precision,
+                    loss_calculator,
+                    metric_calculator,
+                    output_type=output_type,
+                    target_config=target_config,
+                )
 
             if is_train:
-                optimizer.zero_grad()
+                with record_function("train.optimizer.zero_grad"):
+                    optimizer.zero_grad()
                 if precision == "float16" and scaler is not None:
-                    scaler.scale(loss).backward()
-                    scaler.step(optimizer)
-                    scaler.update()
+                    with record_function("train.backward"):
+                        scaler.scale(loss).backward()
+                    with record_function("train.optimizer.step"):
+                        scaler.step(optimizer)
+                    with record_function("train.grad_scaler.update"):
+                        scaler.update()
                 else:
-                    loss.backward()
-                    optimizer.step()
+                    with record_function("train.backward"):
+                        loss.backward()
+                    with record_function("train.optimizer.step"):
+                        optimizer.step()
                 if cfg.training.get("scheduler_update_mode", "epoch") == "step":
-                    scheduler.step()
+                    with record_function("train.scheduler.step"):
+                        scheduler.step()
 
             ### Accumulate on-device with no sync. First iteration clones
             ### so subsequent in-place ``add_`` calls don't alias the
@@ -449,76 +472,53 @@ def _run_epoch(
                 f"{mem_str}"
             )
 
-            ### Per-step TensorBoard: train only (val_writer is intentionally
-            ### epoch-only to keep dashboards uncluttered). Per-step JSONL is
-            ### emitted in both modes so downstream tooling can compute val
-            ### step-time statistics directly instead of inferring them from
-            ### ``val_ts - train_ts``.
-            if dist_manager.rank == 0:
+            ### Per-step TensorBoard + JSONL: train only. Val emits one
+            ### epoch-level entry below to keep dashboards uncluttered.
+            if is_train and dist_manager.rank == 0:
+                global_step = epoch * num_steps + i
                 losses_floats, metrics_floats = _to_float_dicts(losses, metrics)
-                if is_train:
-                    global_step = epoch * num_steps + i
-                    if writer is not None:
-                        ### Loss keys already start with `loss/`, so the iteration
-                        ### prefix yields tags like `iteration/loss/pressure`;
-                        ### metric tags get an explicit `iteration/metrics/...`
-                        ### namespace so we never have to split by string prefix.
-                        _log_to_tensorboard(
-                            writer, losses_floats, "iteration", global_step
-                        )
-                        _log_to_tensorboard(
-                            writer, metrics_floats, "iteration/metrics", global_step
-                        )
-                        writer.add_scalar(
-                            "iteration/lr",
-                            scheduler.get_last_lr()[0],
-                            global_step=global_step,
-                        )
-                        writer.add_scalar(
-                            "iteration/performance/mem_gb",
-                            mem_gb,
-                            global_step=global_step,
-                        )
-                        writer.add_scalar(
-                            "iteration/performance/step_time_s",
-                            step_dt,
-                            global_step=global_step,
-                        )
-                    if log_jsonl is not None:
-                        log_jsonl(
-                            {
-                                "phase": "step",
-                                "global_step": global_step,
-                                "loss": this_loss,
-                                "mem_gb": mem_gb,
-                                "step_time_s": step_dt,
-                                **losses_floats,
-                                **metrics_floats,
-                            }
-                        )
-                elif log_jsonl is not None:
-                    ### Val per-step record. ``epoch`` is explicit (unlike
-                    ### the train ``step`` records, which the parser infers
-                    ### from surrounding ``train`` markers) so val_step
-                    ### records can be associated with an epoch without
-                    ### relying on surrounding context. ``mem_gb`` is
-                    ### intentionally omitted -- the no_grad path is the
-                    ### lowest-noise place to measure step time and we
-                    ### don't want allocator state hopping in TB.
+                if writer is not None:
+                    ### Loss keys already start with `loss/`, so the iteration
+                    ### prefix yields tags like `iteration/loss/pressure`;
+                    ### metric tags get an explicit `iteration/metrics/...`
+                    ### namespace so we never have to split by string prefix.
+                    _log_to_tensorboard(writer, losses_floats, "iteration", global_step)
+                    _log_to_tensorboard(
+                        writer, metrics_floats, "iteration/metrics", global_step
+                    )
+                    writer.add_scalar(
+                        "iteration/lr",
+                        scheduler.get_last_lr()[0],
+                        global_step=global_step,
+                    )
+                    writer.add_scalar(
+                        "iteration/performance/mem_gb",
+                        mem_gb,
+                        global_step=global_step,
+                    )
+                    writer.add_scalar(
+                        "iteration/performance/step_time_s",
+                        step_dt,
+                        global_step=global_step,
+                    )
+                if log_jsonl is not None:
                     log_jsonl(
                         {
-                            "phase": "val_step",
-                            "epoch": epoch,
-                            "val_step": i,
+                            "phase": "step",
+                            "global_step": global_step,
                             "loss": this_loss,
+                            "mem_gb": mem_gb,
                             "step_time_s": step_dt,
                             **losses_floats,
                             **metrics_floats,
                         }
                     )
 
-            if cfg.profile and i >= _PROFILE_MAX_STEPS:
-                break
+            if profile_steps:
+                Profiler().step()
+
+                if i + 1 >= _PROFILE_TOTAL_STEPS:
+                    break
             step_t0 = time.perf_counter()
 
     epoch_dt = time.perf_counter() - epoch_t0
@@ -566,6 +566,7 @@ def train_epoch(
     target_config: dict[str, FieldType],
     train_writer: SummaryWriter | None = None,
     log_jsonl: Callable[[dict[str, Any]], None] | None = None,
+    profile_steps: bool = False,
 ) -> tuple[float, dict[str, float]]:
     """Run one training epoch (delegates to :func:`_run_epoch` in train mode)."""
     return _run_epoch(
@@ -585,6 +586,7 @@ def train_epoch(
         scaler=scaler,
         writer=train_writer,
         log_jsonl=log_jsonl,
+        profile_steps=profile_steps,
     )
 
 
@@ -720,6 +722,8 @@ def benchmark_io_epoch(
                 f"max={v_flat.max().item(): .6e}"
             )
 
+        Profiler().step()
+
         if max_steps is not None and i + 1 >= max_steps:
             break
         step_t0 = time.perf_counter()
@@ -850,18 +854,8 @@ def _build_manifest_samplers(
     )
     ### When no explicit val split is configured, fall back to the train
     ### indices but build a separate non-shuffled, no-drop sampler so val
-    ### iteration is deterministic and covers every sample. This used to
-    ### happen silently; warn loudly so the duplication shows up in the
-    ### run log instead of producing a "val == train" loss curve that
-    ### looks correct.
+    ### iteration is deterministic and covers every sample.
     if val_indices is None:
-        _LOGGER.warning(
-            "Manifest mode: no val_split / val_manifest configured; "
-            "validation will iterate the train split (%d samples). "
-            "Set 'val_split:' or 'val_manifest:' on the data block to "
-            "use a real holdout.",
-            len(train_indices),
-        )
         val_indices = train_indices
     val_sampler = ManifestSampler(
         val_indices,
@@ -1159,7 +1153,6 @@ def main(cfg: DictConfig) -> None:
             ``compile``, ``profile``, ``benchmark_io``, ``logging``, and
             related keys.
     """
-
     DistributedManager.initialize()
     dist_manager = DistributedManager()
     logger = RankZeroLoggingWrapper(PythonLogger(name="training"), dist_manager)
@@ -1337,12 +1330,31 @@ def main(cfg: DictConfig) -> None:
     num_epochs = cfg.training.num_epochs
     logger.info(f"Starting training for {num_epochs} epochs...")
 
-    # Unless profiling is enabled, this is a null context:
-    with Profiler():
-        for epoch in range(loaded_epoch, num_epochs):
-            logger.info(f"--- Epoch {epoch + 1}/{num_epochs} ---")
-            train_loader.set_epoch(epoch)
+    if cfg.profile and num_epochs <= _PROFILE_START_EPOCH:
+        logger.warning(
+            "profile=true but profiling is configured to start at epoch 2; "
+            f"num_epochs={num_epochs} will not reach the profiling window."
+        )
+    elif cfg.profile and loaded_epoch > _PROFILE_START_EPOCH:
+        logger.warning(
+            "profile=true but the loaded checkpoint resumes after epoch 2; "
+            "the configured profiling window has already passed."
+        )
 
+    for epoch in range(loaded_epoch, num_epochs):
+        logger.info(f"--- Epoch {epoch + 1}/{num_epochs} ---")
+        train_loader.set_epoch(epoch)
+
+        profile_train_epoch = bool(cfg.profile) and epoch == _PROFILE_START_EPOCH
+        if profile_train_epoch:
+            logger.info(
+                "PyTorch profiler active for epoch 2: "
+                f"{_PROFILE_WARMUP_STEPS} warmup step(s), "
+                f"{_PROFILE_ACTIVE_STEPS} recorded step(s)."
+            )
+
+        profile_ctx = Profiler() if profile_train_epoch else nullcontext()
+        with profile_ctx:
             train_loss, train_metrics = train_epoch(
                 train_loader,
                 model,
@@ -1359,52 +1371,53 @@ def main(cfg: DictConfig) -> None:
                 target_config=target_config,
                 train_writer=train_writer,
                 log_jsonl=log_jsonl,
+                profile_steps=profile_train_epoch,
             )
 
-            val_loss, val_metrics = val_epoch(
-                val_loader,
-                model,
-                loss_calculator,
-                metric_calculator,
-                logger,
-                epoch,
-                cfg,
-                dist_manager,
-                output_type=output_type,
-                target_config=target_config,
-                val_writer=val_writer,
-                log_jsonl=log_jsonl,
-            )
+        val_loss, val_metrics = val_epoch(
+            val_loader,
+            model,
+            loss_calculator,
+            metric_calculator,
+            logger,
+            epoch,
+            cfg,
+            dist_manager,
+            output_type=output_type,
+            target_config=target_config,
+            val_writer=val_writer,
+            log_jsonl=log_jsonl,
+        )
 
-            if dist_manager.rank == 0:
-                all_keys = list(dict.fromkeys(list(train_metrics) + list(val_metrics)))
+        if dist_manager.rank == 0:
+            all_keys = list(dict.fromkeys(list(train_metrics) + list(val_metrics)))
 
-                rows = [
-                    [
-                        k,
-                        f"{train_metrics.get(k, float('nan')):.6f}",
-                        f"{val_metrics.get(k, float('nan')):.6f}",
-                    ]
-                    for k in all_keys
+            rows = [
+                [
+                    k,
+                    f"{train_metrics.get(k, float('nan')):.6f}",
+                    f"{val_metrics.get(k, float('nan')):.6f}",
                 ]
+                for k in all_keys
+            ]
 
-                table = tabulate(
-                    rows, headers=["Metric", "Train", "Val"], tablefmt="pretty"
-                )
-                logger.info(
-                    f"\nEpoch [{epoch}/{cfg.training.num_epochs}] "
-                    f"Train Loss: {train_loss:.6f}  Val Loss: {val_loss:.6f}\n"
-                    f"{table}\n"
-                )
+            table = tabulate(
+                rows, headers=["Metric", "Train", "Val"], tablefmt="pretty"
+            )
+            logger.info(
+                f"\nEpoch [{epoch}/{cfg.training.num_epochs}] "
+                f"Train Loss: {train_loss:.6f}  Val Loss: {val_loss:.6f}\n"
+                f"{table}\n"
+            )
 
-            if epoch % cfg.training.save_interval == 0 and dist_manager.rank == 0:
-                save_checkpoint(**ckpt_args, epoch=epoch + 1)
-                if normalizer is not None:
-                    norm_path = os.path.join(ckpt_args["path"], "norm_stats.pt")
-                    torch.save(normalizer.stats, norm_path)
+        if epoch % cfg.training.save_interval == 0 and dist_manager.rank == 0:
+            save_checkpoint(**ckpt_args, epoch=epoch + 1)
+            if normalizer is not None:
+                norm_path = os.path.join(ckpt_args["path"], "norm_stats.pt")
+                torch.save(normalizer.stats, norm_path)
 
-            if cfg.training.get("scheduler_update_mode", "epoch") == "epoch":
-                scheduler.step()
+        if cfg.training.get("scheduler_update_mode", "epoch") == "epoch":
+            scheduler.step()
 
     if dist_manager.rank == 0:
         if train_writer is not None:
@@ -1425,11 +1438,22 @@ def launch(cfg: DictConfig) -> None:
 
     Args:
         cfg: Hydra-composed config (override with ``--config-name``).
-            When ``cfg.profile`` is truthy, torch profiling is enabled.
+            When ``cfg.profile`` is truthy, torch profiling is enabled for
+            the configured short window in epoch 2.
     """
     profiler = Profiler()
     if cfg.profile:
-        profiler.enable("torch")
+        profile_dir = Path(cfg.output_dir) / cfg.run_id / "profiler"
+        profiler.output_path = profile_dir
+        profiler.enable("torch").reconfigure(
+            schedule=torch.profiler.schedule(
+                wait=0,
+                warmup=_PROFILE_WARMUP_STEPS,
+                active=_PROFILE_ACTIVE_STEPS,
+                repeat=1,
+            ),
+            with_stack=False,
+        )
     profiler.initialize()
     main(cfg)
     profiler.finalize()

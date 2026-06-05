@@ -601,6 +601,46 @@ class MultiScaleFeatureExtractor(nn.Module):
             dim=-1,
         )
 
+    def extract_shared_context_and_local_features(
+        self,
+        spatial_coords: Float[torch.Tensor, "batch points spatial_dim"],
+        geometry: Float[torch.Tensor, "batch points geometry_dim"],
+    ) -> tuple[
+        list[Float[torch.Tensor, "batch heads slices dim"]],
+        Float[torch.Tensor, "batch points total_hidden"],
+    ]:
+        r"""Extract context and local features from one processor pass.
+
+        This path is correct only when ``spatial_coords`` and ``geometry`` are
+        the same coordinate tensor. In that case, the legacy context call
+        ``processor(spatial_coords, geometry)`` and local call
+        ``processor(geometry, spatial_coords)`` produce the same processed
+        features, so the result can be shared by both branches.
+        """
+        if not torch.compiler.is_compiling():
+            same_storage = (
+                spatial_coords.data_ptr() == geometry.data_ptr()
+                and spatial_coords.shape == geometry.shape
+                and spatial_coords.stride() == geometry.stride()
+                and spatial_coords.storage_offset() == geometry.storage_offset()
+            )
+            if not same_storage:
+                raise ValueError(
+                    "reuse_context_local_features requires spatial_coords and "
+                    "geometry to be the same tensor storage. Disable the flag "
+                    "for configs where local_positions and geometry differ."
+                )
+
+        processed_features = [
+            processor(spatial_coords, geometry) for processor in self.processors
+        ]
+        context_features = [
+            tokenizer(features)
+            for tokenizer, features in zip(self.tokenizers, processed_features)
+        ]
+        local_features = torch.cat(processed_features, dim=-1)
+        return context_features, local_features
+
 
 class GlobalContextBuilder(nn.Module):
     r"""Orchestrates all context construction with a clean, simple interface.
@@ -688,8 +728,10 @@ class GlobalContextBuilder(nn.Module):
         plus: bool = False,
         include_local_features: bool = False,
         concrete_dropout: bool = False,
+        reuse_context_local_features: bool = False,
     ) -> None:
         super().__init__()
+        self.reuse_context_local_features = reuse_context_local_features
 
         # Set defaults for mutable arguments
         if radii is None:
@@ -843,16 +885,24 @@ class GlobalContextBuilder(nn.Module):
             for i, embedding in enumerate(local_embeddings):
                 spatial_coords = local_positions[i]  # Extract coordinates
 
-                # Get tokenized context features from multi-scale extractor
-                context_feats = self.local_extractors[i].extract_context_features(
-                    spatial_coords, geometry
-                )
-                context_parts.extend(context_feats)
+                if self.reuse_context_local_features:
+                    context_feats, local_feats = self.local_extractors[
+                        i
+                    ].extract_shared_context_and_local_features(
+                        spatial_coords, geometry
+                    )
+                else:
+                    # Get tokenized context features from multi-scale extractor
+                    context_feats = self.local_extractors[i].extract_context_features(
+                        spatial_coords, geometry
+                    )
 
-                # Get concatenated local features for skip connection
-                local_feats = self.local_extractors[i].extract_local_features(
-                    spatial_coords, geometry
-                )
+                    # Get concatenated local features for skip connection
+                    local_feats = self.local_extractors[i].extract_local_features(
+                        spatial_coords, geometry
+                    )
+
+                context_parts.extend(context_feats)
                 local_features.append(local_feats)
 
         # Tokenize geometry features
