@@ -425,3 +425,219 @@ After that, consider a point-output-only Warp path to remove unused mapping
 writes. Reducing radii, changing grid strategy, or fusing multi-radius search
 should be treated as quality/performance experiments unless exact output
 equivalence is proven.
+
+## Surface Optimization Notes
+
+Surface GeoTransolver has a different profile from the volume recipe:
+
+- `conf/model/geotransolver_surface.yaml` has `include_local_features: false`
+- the surface forward pass does not launch `BQWarp` radius search
+- the surface dataload path uses PyTorch/ATen mesh preprocessing kernels instead
+  of NVIDIA Warp kernels
+
+The dominant surface issues after compile were:
+
+- blocking data preparation in `train.train.dataload`
+- optimizer time in `train.optimizer.step`
+
+### Surface Dataload Overlap
+
+The surface dataload range wraps `next(dataloader_iter)`, so it includes reader
+work, mesh transforms, subsampling, compaction, surface-normal/centroid
+construction, and collate. These are implemented with PyTorch tensor operations
+on `Mesh` / `TensorDict` objects, so the profile shows `aten::index`,
+`aten::sort`, `aten::_unique2`, and `aten::copy_`.
+
+The tested overlap configuration was:
+
+```bash
+python src/train.py model=geotransolver_surface dataset=drivaer_ml_surface_profile_tmp \
+  compile=true sampling_resolution=100000 training.num_epochs=3 profile=true \
+  run_id=surface_compiled_100k_overlap_pf2_stream2_20260605_1 \
+  dataloader.use_streams=true dataloader.prefetch_factor=2 \
+  dataloader.num_streams=2 dataloader.num_workers=1
+```
+
+The same configuration was also tested with `compile=false`.
+
+Profile artifacts:
+
+- compiled overlap:
+  `runs/surface_compiled_100k_overlap_pf2_stream2_20260605_1/profiler/torch/trace.json`
+- uncompiled overlap:
+  `runs/surface_uncompiled_100k_overlap_pf2_stream2_20260605_1/profiler/torch/trace.json`
+- parsed summary:
+  `runs/surface_overlap_profile_summary.json`
+
+Measured surface improvement:
+
+| Mode | No-overlap step | Overlap step | Dataload no-overlap | Dataload overlap | Memory no-overlap | Memory overlap |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| compiled | about `0.301 s/step` | about `0.217 s/step` | `149.0 ms` | `5.2 ms` | about `34.85 GB` | about `35.12 GB` |
+| uncompiled | about `0.590 s/step` | about `0.376 s/step` | `206.1 ms` | `0.6 ms` | about `40.67 GB` | about `40.94 GB` |
+
+Conclusion: memory permits dataload overlap at `sampling_resolution=100000` for
+both eager and compiled surface training. The extra reported memory was only
+about `0.3 GB`. The overlap path hides nearly all blocking dataload time, but it
+does introduce some GPU contention because the next batch's preprocessing kernels
+run concurrently with current-step model work.
+
+Keep `num_workers=1` initially. `MeshDataset` comments note that TensorDict
+construction is not safe for arbitrary concurrent worker-thread construction.
+The next low-risk tuning test is:
+
+```bash
+python src/train.py model=geotransolver_surface dataset=drivaer_ml_surface \
+  compile=true sampling_resolution=100000 training.num_epochs=3 profile=true \
+  dataloader.use_streams=true dataloader.prefetch_factor=1 \
+  dataloader.num_streams=1 dataloader.num_workers=1
+```
+
+This checks whether one prefetched batch is enough to hide dataload while causing
+less GPU contention than `prefetch_factor=2,num_streams=2`.
+
+### Surface Dataload Follow-Ups
+
+The overlap setting hides wait time but does not remove the preprocessing work.
+The more structural optimization is a tensor-native surface dataset/cache for
+GeoTransolver surface. The model only needs:
+
+- `interior.points`
+- `boundaries.vehicle.cell_data.normals`
+- `global_data.U_inf`
+- targets: `pressure`, `wss`
+
+A specialized surface reader/cache could store sampled centroids, normals,
+targets, and global features directly. That would avoid rebuilding full `Mesh`
+objects, point compaction, and TensorDict layout conversion each step. This is
+correctness-preserving if the cached tensors exactly match the current transform
+pipeline for the same sample and sampled cell IDs.
+
+### Surface Optimizer Opportunity
+
+After dataload overlap, the largest visible compiled surface block is
+`train.optimizer.step`:
+
+| Run | Optimizer range / profiled step |
+| --- | ---: |
+| compiled no-overlap | `82.2 ms` |
+| compiled overlap | `87.3 ms` |
+| uncompiled no-overlap | `186.3 ms` |
+| uncompiled overlap | `195.8 ms` |
+
+The recipe builds `CombinedOptimizer(Muon, AdamW)` in `src/utils.py`.
+`CombinedOptimizer` itself is only a wrapper around two optimizer steps; the
+profile points at PyTorch Muon's matrix update path. The installed Muon
+implementation loops one 2-D parameter at a time and performs Newton-Schulz
+orthogonalization:
+
+- 5 Newton-Schulz iterations by default
+- each iteration uses two matrix multiplies / `addmm`-style operations
+- surface GeoTransolver has `129` Muon-managed 2-D tensors but only `11` unique
+  shapes
+
+That makes shape-batched Muon the first optimizer implementation candidate.
+Group parameters by identical `(M, N)` shape, stack each group as `(B, M, N)`,
+and run the same Newton-Schulz math with batched matmul:
+
+```python
+gram = x @ x.transpose(-2, -1)
+gram_update = torch.baddbmm(gram, gram, gram, beta=b, alpha=c)
+x = torch.baddbmm(x, gram_update, x, beta=a)
+```
+
+Use `baddbmm` rather than scalar-expanded expressions like
+`b * gram + c * (gram @ gram)`. In the local prototype, the scalar-expanded
+form was fast but showed about `4e-4` max absolute parameter drift after five
+synthetic optimizer steps. The `baddbmm` form kept the same launch-reduction
+benefit while matching stock Muon much more closely.
+
+Prototype result from `scripts/test_shape_batched_muon.py` on the surface
+GeoTransolver model (`129` Muon tensors, `9,001,984` Muon elements):
+
+| Optimizer path | Compiled | Optimizer-only step |
+| --- | ---: | ---: |
+| stock PyTorch Muon | false | `35.3 ms` |
+| stock PyTorch Muon | true | `28.4 ms` |
+| shape-batched Muon prototype | false | `8.1 ms` |
+| shape-batched Muon prototype | true | `4.8 ms` |
+
+Numerical check after five synthetic steps versus stock Muon:
+
+- max parameter absolute difference: `4.7e-6`
+- RMS parameter difference / RMS reference parameter: `3.8e-8`
+- benchmark artifact: `runs/shape_batched_muon_test_baddbmm_30.json`
+
+This should reduce many small per-parameter GEMM launches while preserving Muon
+math for parameters in the same shape group. Momentum, weight decay, and the
+final parameter update can also be grouped with foreach-style operations. PyTorch
+Muon currently has no foreach path.
+
+Validation criteria for a batched Muon prototype:
+
+- compare one optimizer step against PyTorch Muon from identical parameters,
+  gradients, momentum buffers, and hyperparameters
+- use `compile=false` first so graph compilation does not hide behavioral bugs
+- require close numerical agreement, not necessarily bitwise equality, because
+  batched GEMM may change floating-point accumulation order
+- verify checkpoint state compatibility or provide a conversion path before using
+  it for long training runs
+
+### Shape-Batched Muon Implementation Validation
+
+The production implementation is opt-in via:
+
+```bash
+training.optimizer.muon_impl=shape_batched
+```
+
+Default behavior remains stock PyTorch Muon via `muon_impl: stock` in
+`conf/base.yaml`. The implementation lives in `src/shape_batched_muon.py` and is
+selected by `build_muon_optimizer()` in `src/utils.py`.
+
+Production optimizer-only validation artifact:
+`runs/shape_batched_muon_production_30.json`.
+
+| Optimizer path | Compiled | Optimizer-only step |
+| --- | ---: | ---: |
+| stock PyTorch Muon | false | `35.2 ms` |
+| stock PyTorch Muon | true | `26.5 ms` |
+| shape-batched Muon | false | `7.5 ms` |
+| shape-batched Muon | true | `4.7 ms` |
+
+Numerical agreement after five synthetic optimizer steps versus stock Muon:
+
+- max parameter absolute difference: `4.7e-6`
+- RMS parameter difference / RMS reference parameter: `3.8e-8`
+- stock-to-shape and shape-to-stock optimizer state loads both had `0` missing
+  momentum buffers and `0.0` max momentum-buffer difference
+
+Full checkpoint smoke tests also passed in both directions:
+
+- stock checkpoint loaded with `training.optimizer.muon_impl=shape_batched`
+- shape-batched checkpoint loaded with `training.optimizer.muon_impl=stock`
+
+Short real surface profile validation used the same `100000` sampling resolution
+and dataload overlap settings as the earlier surface overlap runs. Summary
+artifact: `runs/shape_batched_muon_real_training_summary.json`.
+
+| Run | Optimizer range | Six-step profile-window avg |
+| --- | ---: | ---: |
+| stock uncompiled overlap | `195.8 ms` | `406.9 ms` |
+| shape-batched uncompiled overlap | `121.1 ms` | `368.5 ms` |
+| stock compiled overlap | `87.3 ms` | `251.5 ms` |
+| shape-batched compiled overlap | `18.8 ms` | `174.1 ms` |
+
+New profile traces:
+
+- `runs/surface_shape_batched_muon_uncompiled_100k_20260606_1/profiler/torch/trace.json`
+- `runs/surface_shape_batched_muon_compiled_100k_20260606_1/profiler/torch/trace.json`
+
+The compiled path benefits most because `torch.compile` already reduces some
+stock-Muon Python overhead, and shape batching then removes most of the remaining
+per-parameter Newton-Schulz launch pattern.
+
+Changing from Muon to a different optimizer may improve speed, but it is not a
+correctness-preserving optimizer implementation optimization because it changes
+the training algorithm.
+

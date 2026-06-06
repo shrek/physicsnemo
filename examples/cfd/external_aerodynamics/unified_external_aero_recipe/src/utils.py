@@ -27,6 +27,7 @@ from omegaconf import DictConfig
 from tensordict import TensorDict
 
 from physicsnemo.optim import CombinedOptimizer
+from shape_batched_muon import ShapeBatchedMuon
 
 if TYPE_CHECKING:
     from nondim import NondimFieldType, NonDimensionalizeByMetadata
@@ -91,13 +92,23 @@ def build_muon_optimizer(
     weight_decay = opt_cfg.get("weight_decay", 1e-4)
     betas = tuple(opt_cfg.get("betas", [0.9, 0.999]))
     eps = opt_cfg.get("eps", 1e-8)
+    muon_impl = opt_cfg.get("muon_impl", "stock")
+    if muon_impl == "stock":
+        muon_cls = torch.optim.Muon
+    elif muon_impl == "shape_batched":
+        muon_cls = ShapeBatchedMuon
+    else:
+        raise ValueError(
+            "training.optimizer.muon_impl must be 'stock' or 'shape_batched', "
+            f"got {muon_impl!r}"
+        )
 
     compile_kwargs = {} if compile_optimizer else None
 
     if muon_params and other_params:
         return CombinedOptimizer(
             [
-                torch.optim.Muon(
+                muon_cls(
                     muon_params,
                     lr=lr,
                     weight_decay=weight_decay,
@@ -114,7 +125,7 @@ def build_muon_optimizer(
             torch_compile_kwargs=compile_kwargs,
         )
     elif muon_params:
-        opt = torch.optim.Muon(
+        opt = muon_cls(
             muon_params,
             lr=lr,
             weight_decay=weight_decay,
