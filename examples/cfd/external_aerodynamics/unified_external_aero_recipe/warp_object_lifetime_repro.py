@@ -1,26 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: Apache-2.0
-"""Focused Warp race reproducers for GeoTransolver SDF and neighbor search.
+"""Focused async lifetime reproducers for Warp-backed PhysicsNeMo ops.
 
-These reproducers avoid the full training loop and isolate two failure classes:
-
-1. Async lifetime: a Python owner such as wp.Mesh/wp.HashGrid is destroyed while
-   CUDA work using its raw id may still be pending.
-2. Warp native contention: multiple Python threads concurrently enter Warp
-   spatial-index construction/update/destruction paths.
+This script checks whether local Python owners such as ``wp.Mesh`` and
+``wp.HashGrid`` are destroyed while CUDA work using their raw ids is still
+pending on the launch stream.
 
 Example commands:
 
-  python warp_race_repros.py lifetime-sdf --queries 1000000
-  python warp_race_repros.py lifetime-neighbor --points 65536 --queries 65536
-  python warp_race_repros.py contention-mesh --workers 4 --iterations 100
-  python warp_race_repros.py contention-hashgrid --workers 4 --iterations 100
-  python warp_race_repros.py contention-mixed --workers 4 --iterations 100
-
-For stronger diagnostics, run with CUDA_LAUNCH_BLOCKING=0 and compute-sanitizer.
-Use --lock and --sync-before-destroy as an A/B check for thread safety versus
-async lifetime.
+  python warp_object_lifetime_repro.py sdf --queries 1000000
+  python warp_object_lifetime_repro.py neighbor --points 65536 --queries 65536
 """
 
 from __future__ import annotations
@@ -30,7 +20,6 @@ import contextlib
 import gc
 import os
 import sys
-import threading
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -83,7 +72,6 @@ def traced_destructor(
     original_del = getattr(cls, "__del__", None)
 
     def _patched_del(self: Any) -> None:
-        pending: bool | None
         try:
             pending = None if stream is None else not stream.query()
         except Exception:
@@ -118,17 +106,11 @@ def traced_destructor(
 def require_cuda(device: str) -> torch.device:
     dev = torch.device(device)
     if dev.type != "cuda":
-        raise ValueError("These reproducers require a CUDA device")
+        raise ValueError("This reproducer requires a CUDA device")
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is not available")
     torch.cuda.set_device(dev)
     wp.init()
-    return dev
-
-
-def set_thread_cuda_device(device: str) -> torch.device:
-    dev = torch.device(device)
-    torch.cuda.set_device(dev)
     return dev
 
 
@@ -174,7 +156,7 @@ def print_lifetime_summary(hits: list[DestructorHit], stream: torch.cuda.Stream)
         )
 
 
-def lifetime_sdf(args: argparse.Namespace) -> None:
+def run_sdf(args: argparse.Namespace) -> None:
     from physicsnemo.nn.functional.geometry.sdf import signed_distance_field
 
     device = require_cuda(args.device)
@@ -192,7 +174,6 @@ def lifetime_sdf(args: argparse.Namespace) -> None:
                 queries,
                 use_sign_winding_number=args.use_sign_winding_number,
             )
-            # Keep output tensors alive until after the diagnostic sync.
             keep_alive = (sdf, hit_points)
 
         print_lifetime_summary(hits, stream)
@@ -200,7 +181,7 @@ def lifetime_sdf(args: argparse.Namespace) -> None:
         print(f"[done] sdf_sum={float(keep_alive[0].float().sum().item()):.6f}")
 
 
-def lifetime_neighbor(args: argparse.Namespace) -> None:
+def run_neighbor(args: argparse.Namespace) -> None:
     from physicsnemo.nn.functional.neighbors.radius_search._warp_impl import (
         radius_search_impl,
     )
@@ -229,138 +210,6 @@ def lifetime_neighbor(args: argparse.Namespace) -> None:
         print(f"[done] indices_shape={tuple(keep_alive[0].shape)}")
 
 
-@contextlib.contextmanager
-def optional_lock(lock: threading.Lock | None) -> Iterator[None]:
-    if lock is None:
-        yield
-    else:
-        with lock:
-            yield
-
-
-def mesh_contention_worker(
-    args: argparse.Namespace,
-    worker_id: int,
-    barrier: threading.Barrier,
-    lock: threading.Lock | None,
-) -> None:
-    device = set_thread_cuda_device(args.device)
-    stream = torch.cuda.Stream(device=device)
-    vertices, faces = make_plane_mesh(args.mesh_resolution, device)
-    wp_vertices = wp.from_torch(vertices, dtype=wp.vec3)
-    wp_faces = wp.from_torch(faces.reshape(-1), dtype=wp.int32)
-    wp_stream = wp.stream_from_torch(stream)
-
-    barrier.wait()
-    for step in range(args.iterations):
-        with torch.cuda.stream(stream):
-            with optional_lock(lock):
-                with wp.ScopedStream(wp_stream):
-                    mesh = wp.Mesh(
-                        points=wp_vertices,
-                        indices=wp_faces,
-                        support_winding_number=args.use_sign_winding_number,
-                    )
-                    if args.sync_before_destroy:
-                        wp.synchronize_stream(wp_stream)
-                    del mesh
-        if args.progress_every and step % args.progress_every == 0:
-            print(f"[worker {worker_id}] mesh step={step}", flush=True)
-
-    stream.synchronize()
-
-
-def hashgrid_contention_worker(
-    args: argparse.Namespace,
-    worker_id: int,
-    barrier: threading.Barrier,
-    lock: threading.Lock | None,
-) -> None:
-    device = set_thread_cuda_device(args.device)
-    stream = torch.cuda.Stream(device=device)
-    points = make_points(args.points, device, args.seed + worker_id)
-    wp_points = wp.from_torch(points, dtype=wp.vec3)
-    wp_stream = wp.stream_from_torch(stream)
-
-    barrier.wait()
-    for step in range(args.iterations):
-        with torch.cuda.stream(stream):
-            with optional_lock(lock):
-                with wp.ScopedStream(wp_stream):
-                    grid = wp.HashGrid(
-                        dim_x=args.grid_dim,
-                        dim_y=args.grid_dim,
-                        dim_z=args.grid_dim,
-                        device=wp_points.device,
-                    )
-                    grid.reserve(args.points)
-                    grid.build(points=wp_points, radius=float(args.radius))
-                    if args.sync_before_destroy:
-                        wp.synchronize_stream(wp_stream)
-                    del grid
-        if args.progress_every and step % args.progress_every == 0:
-            print(f"[worker {worker_id}] hashgrid step={step}", flush=True)
-
-    stream.synchronize()
-
-
-def run_contention(args: argparse.Namespace) -> None:
-    require_cuda(args.device)
-    lock = threading.Lock() if args.lock else None
-    barrier = threading.Barrier(args.workers)
-    threads: list[threading.Thread] = []
-    exceptions: list[BaseException] = []
-    exceptions_lock = threading.Lock()
-
-    if args.lock and not args.sync_before_destroy:
-        print(
-            "[warning] --lock serializes native entry, but without "
-            "--sync-before-destroy async lifetime remains intentionally exposed.",
-            flush=True,
-        )
-
-    for worker_id in range(args.workers):
-        if args.mode == "contention-mesh":
-            target = mesh_contention_worker
-        elif args.mode == "contention-hashgrid":
-            target = hashgrid_contention_worker
-        elif worker_id % 2 == 0:
-            target = mesh_contention_worker
-        else:
-            target = hashgrid_contention_worker
-
-        def wrapped_target(
-            worker_target: Any = target,
-            current_worker_id: int = worker_id,
-        ) -> None:
-            try:
-                worker_target(args, current_worker_id, barrier, lock)
-            except BaseException as exc:
-                with exceptions_lock:
-                    exceptions.append(exc)
-                with contextlib.suppress(Exception):
-                    barrier.abort()
-                raise
-
-        thread = threading.Thread(
-            target=wrapped_target,
-            name=f"warp-repro-{worker_id}",
-        )
-        thread.start()
-        threads.append(thread)
-
-    for thread in threads:
-        thread.join()
-
-    if exceptions:
-        raise RuntimeError(
-            f"{len(exceptions)} worker thread(s) failed; first error: {exceptions[0]!r}"
-        )
-
-    torch.cuda.synchronize(torch.device(args.device))
-    print("[done] contention run completed")
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="mode", required=True)
@@ -370,35 +219,21 @@ def build_parser() -> argparse.ArgumentParser:
         subparser.add_argument("--seed", type=int, default=1234)
         subparser.add_argument("--radius", type=float, default=0.05)
 
-    sdf = subparsers.add_parser("lifetime-sdf")
+    sdf = subparsers.add_parser("sdf")
     add_common(sdf)
     sdf.add_argument("--mesh-resolution", type=int, default=96)
     sdf.add_argument("--queries", type=int, default=1_000_000)
     sdf.add_argument("--use-sign-winding-number", action="store_true")
-    sdf.set_defaults(func=lifetime_sdf)
+    sdf.set_defaults(func=run_sdf)
 
-    neighbor = subparsers.add_parser("lifetime-neighbor")
+    neighbor = subparsers.add_parser("neighbor")
     add_common(neighbor)
     neighbor.add_argument("--points", type=int, default=65_536)
     neighbor.add_argument("--queries", type=int, default=65_536)
     neighbor.add_argument("--max-points", type=int, default=8)
     neighbor.add_argument("--return-dists", action="store_true")
     neighbor.add_argument("--return-points", action="store_true")
-    neighbor.set_defaults(func=lifetime_neighbor)
-
-    for mode in ("contention-mesh", "contention-hashgrid", "contention-mixed"):
-        contention = subparsers.add_parser(mode)
-        add_common(contention)
-        contention.add_argument("--workers", type=int, default=4)
-        contention.add_argument("--iterations", type=int, default=100)
-        contention.add_argument("--mesh-resolution", type=int, default=64)
-        contention.add_argument("--points", type=int, default=65_536)
-        contention.add_argument("--grid-dim", type=int, default=128)
-        contention.add_argument("--lock", action="store_true")
-        contention.add_argument("--sync-before-destroy", action="store_true")
-        contention.add_argument("--use-sign-winding-number", action="store_true")
-        contention.add_argument("--progress-every", type=int, default=0)
-        contention.set_defaults(func=run_contention)
+    neighbor.set_defaults(func=run_neighbor)
 
     return parser
 
