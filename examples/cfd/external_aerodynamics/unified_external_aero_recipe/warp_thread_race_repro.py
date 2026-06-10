@@ -20,9 +20,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import faulthandler
 import os
+import signal
 import sys
 import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -113,14 +116,18 @@ def mesh_worker(
     args: argparse.Namespace,
     worker_id: int,
     barrier: threading.Barrier,
+    setup_lock: threading.Lock,
     lock: threading.Lock | None,
 ) -> None:
-    device = set_thread_cuda_device(args.device)
-    stream = torch.cuda.Stream(device=device)
-    vertices, faces = make_plane_mesh(args.mesh_resolution, device)
-    wp_vertices = wp.from_torch(vertices, dtype=wp.vec3)
-    wp_faces = wp.from_torch(faces.reshape(-1), dtype=wp.int32)
-    wp_stream = wp.stream_from_torch(stream)
+    with setup_lock:
+        device = set_thread_cuda_device(args.device)
+        stream = torch.cuda.Stream(device=device)
+        vertices, faces = make_plane_mesh(args.mesh_resolution, device)
+        wp_vertices = wp.from_torch(vertices, dtype=wp.vec3)
+        wp_faces = wp.from_torch(faces.reshape(-1), dtype=wp.int32)
+        wp_stream = wp.stream_from_torch(stream)
+        if args.progress_every:
+            print(f"[worker {worker_id}] mesh setup complete", flush=True)
 
     barrier.wait()
     for step in range(args.iterations):
@@ -145,13 +152,17 @@ def hashgrid_worker(
     args: argparse.Namespace,
     worker_id: int,
     barrier: threading.Barrier,
+    setup_lock: threading.Lock,
     lock: threading.Lock | None,
 ) -> None:
-    device = set_thread_cuda_device(args.device)
-    stream = torch.cuda.Stream(device=device)
-    points = make_points(args.points, device, args.seed + worker_id)
-    wp_points = wp.from_torch(points, dtype=wp.vec3)
-    wp_stream = wp.stream_from_torch(stream)
+    with setup_lock:
+        device = set_thread_cuda_device(args.device)
+        stream = torch.cuda.Stream(device=device)
+        points = make_points(args.points, device, args.seed + worker_id)
+        wp_points = wp.from_torch(points, dtype=wp.vec3)
+        wp_stream = wp.stream_from_torch(stream)
+        if args.progress_every:
+            print(f"[worker {worker_id}] hashgrid setup complete", flush=True)
 
     barrier.wait()
     for step in range(args.iterations):
@@ -176,8 +187,14 @@ def hashgrid_worker(
 
 
 def run(args: argparse.Namespace) -> None:
+    faulthandler.enable()
+    if hasattr(signal, "SIGUSR1"):
+        with contextlib.suppress(RuntimeError):
+            faulthandler.register(signal.SIGUSR1, file=sys.stderr, all_threads=True)
+
     require_cuda(args.device)
     lock = threading.Lock() if args.lock else None
+    setup_lock = threading.Lock()
     barrier = threading.Barrier(args.workers)
     threads: list[threading.Thread] = []
     exceptions: list[BaseException] = []
@@ -205,7 +222,7 @@ def run(args: argparse.Namespace) -> None:
             current_worker_id: int = worker_id,
         ) -> None:
             try:
-                worker_target(args, current_worker_id, barrier, lock)
+                worker_target(args, current_worker_id, barrier, setup_lock, lock)
             except BaseException as exc:
                 with exceptions_lock:
                     exceptions.append(exc)
@@ -220,8 +237,25 @@ def run(args: argparse.Namespace) -> None:
         thread.start()
         threads.append(thread)
 
-    for thread in threads:
-        thread.join()
+    try:
+        if args.join_timeout <= 0:
+            for thread in threads:
+                thread.join()
+        else:
+            deadline = time.monotonic() + args.join_timeout
+            for thread in threads:
+                while thread.is_alive():
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+                        raise TimeoutError(
+                            f"timed out after {args.join_timeout}s waiting for worker threads"
+                        )
+                    thread.join(timeout=min(1.0, remaining))
+    except KeyboardInterrupt:
+        print("[interrupt] dumping all Python thread stacks", file=sys.stderr, flush=True)
+        faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+        raise
 
     if exceptions:
         raise RuntimeError(
@@ -247,6 +281,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sync-before-destroy", action="store_true")
     parser.add_argument("--use-sign-winding-number", action="store_true")
     parser.add_argument("--progress-every", type=int, default=0)
+    parser.add_argument(
+        "--join-timeout",
+        type=float,
+        default=0.0,
+        help="Dump all thread stacks and fail if workers do not finish within this many seconds.",
+    )
     parser.set_defaults(func=run)
     return parser
 
