@@ -113,6 +113,19 @@ def make_points(count: int, device: torch.device, seed: int) -> torch.Tensor:
     return (2.0 * torch.rand((count, 3), device=device, generator=gen) - 1.0).contiguous()
 
 
+def make_far_points(count: int, device: torch.device) -> torch.Tensor:
+    base = torch.arange(count, device=device, dtype=torch.float32)
+    points = torch.stack(
+        (
+            1000.0 + base,
+            2000.0 + 0.5 * base,
+            3000.0 - 0.25 * base,
+        ),
+        dim=1,
+    )
+    return points.contiguous()
+
+
 def make_plane_mesh(
     resolution: int,
     device: torch.device,
@@ -139,6 +152,15 @@ def make_plane_mesh(
     return vertices, faces.to(torch.int32).contiguous()
 
 
+def make_shifted_plane_mesh(
+    resolution: int,
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    vertices, faces = make_plane_mesh(resolution, device)
+    vertices = vertices + torch.tensor((1000.0, 1000.0, 1000.0), device=device)
+    return vertices.contiguous(), faces
+
+
 def enqueue_delay(args: argparse.Namespace, device: torch.device, wp_stream: wp.Stream) -> list[torch.Tensor]:
     buffers = []
     for _ in range(args.delay_launches):
@@ -160,7 +182,12 @@ def run_mesh(args: argparse.Namespace) -> None:
     pressure_stream = torch.cuda.Stream(device=device)
     wp_pressure_stream = wp.stream_from_torch(pressure_stream)
     vertices, faces = make_plane_mesh(args.mesh_resolution, device)
+    replacement_vertices, replacement_faces = make_shifted_plane_mesh(
+        args.replacement_mesh_resolution,
+        device,
+    )
     query_points = make_points(args.queries, device, args.seed)
+    expected_sum: float | None = None
 
     for iteration in range(args.iterations):
         out = torch.empty(args.queries, device=device, dtype=torch.float32)
@@ -197,8 +224,15 @@ def run_mesh(args: argparse.Namespace) -> None:
         replacement_meshes = []
         if args.post_delete_churn:
             with torch.cuda.stream(pressure_stream), wp.ScopedStream(wp_pressure_stream):
+                replacement_wp_vertices = wp.from_torch(replacement_vertices, dtype=wp.vec3)
+                replacement_wp_faces = wp.from_torch(
+                    replacement_faces.reshape(-1), dtype=wp.int32
+                )
                 for _ in range(args.post_delete_churn):
-                    replacement = wp.Mesh(points=wp_vertices, indices=wp_faces)
+                    replacement = wp.Mesh(
+                        points=replacement_wp_vertices,
+                        indices=replacement_wp_faces,
+                    )
                     replacement_meshes.append(replacement)
             reused = sum(int(replacement.id) == mesh_id for replacement in replacement_meshes)
             print(
@@ -209,7 +243,19 @@ def run_mesh(args: argparse.Namespace) -> None:
             pressure_stream.synchronize()
 
         stream.synchronize()
-        print(f"[mesh] iter={iteration} survived sum={float(out.sum().item()):.6f}", flush=True)
+        actual_sum = float(out.sum().item())
+        if expected_sum is None:
+            expected_sum = actual_sum
+        delta = abs(actual_sum - expected_sum)
+        print(
+            f"[mesh] iter={iteration} survived sum={actual_sum:.6f} "
+            f"delta_from_iter0={delta:.6f}",
+            flush=True,
+        )
+        if args.assert_stable and delta > args.tolerance:
+            raise RuntimeError(
+                f"mesh result changed: expected {expected_sum}, got {actual_sum}"
+            )
 
         if args.retain_owner:
             del mesh
@@ -225,6 +271,8 @@ def run_hashgrid(args: argparse.Namespace) -> None:
     wp_pressure_stream = wp.stream_from_torch(pressure_stream)
     points = make_points(args.points, device, args.seed)
     queries = make_points(args.queries, device, args.seed + 1)
+    replacement_points = make_far_points(args.replacement_points, device)
+    expected_count_sum: int | None = None
 
     for iteration in range(args.iterations):
         counts = torch.empty(args.queries, device=device, dtype=torch.int32)
@@ -263,15 +311,19 @@ def run_hashgrid(args: argparse.Namespace) -> None:
         replacement_grids = []
         if args.post_delete_churn:
             with torch.cuda.stream(pressure_stream), wp.ScopedStream(wp_pressure_stream):
+                replacement_wp_points = wp.from_torch(replacement_points, dtype=wp.vec3)
                 for _ in range(args.post_delete_churn):
                     replacement = wp.HashGrid(
                         dim_x=128,
                         dim_y=128,
                         dim_z=128,
-                        device=wp_points.device,
+                        device=replacement_wp_points.device,
                     )
-                    replacement.reserve(args.points)
-                    replacement.build(points=wp_points, radius=0.5 * float(args.radius))
+                    replacement.reserve(args.replacement_points)
+                    replacement.build(
+                        points=replacement_wp_points,
+                        radius=float(args.replacement_radius),
+                    )
                     replacement_grids.append(replacement)
             reused = sum(int(replacement.id) == grid_id for replacement in replacement_grids)
             print(
@@ -282,10 +334,17 @@ def run_hashgrid(args: argparse.Namespace) -> None:
             pressure_stream.synchronize()
 
         stream.synchronize()
+        count_sum = int(counts.sum().item())
         print(
-            f"[hashgrid] iter={iteration} survived count_sum={int(counts.sum().item())}",
+            f"[hashgrid] iter={iteration} survived count_sum={count_sum}",
             flush=True,
         )
+        if expected_count_sum is None:
+            expected_count_sum = count_sum
+        if args.assert_stable and count_sum != expected_count_sum:
+            raise RuntimeError(
+                f"hashgrid result changed: expected {expected_count_sum}, got {count_sum}"
+            )
 
         if args.retain_owner:
             del grid
@@ -314,6 +373,11 @@ def add_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Control mode: keep the Warp object alive until after stream synchronization.",
     )
+    parser.add_argument(
+        "--assert-stable",
+        action="store_true",
+        help="Raise if results differ from iteration 0.",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -323,15 +387,19 @@ def build_parser() -> argparse.ArgumentParser:
     mesh = subparsers.add_parser("mesh")
     add_common(mesh)
     mesh.add_argument("--mesh-resolution", type=int, default=96)
+    mesh.add_argument("--replacement-mesh-resolution", type=int, default=32)
     mesh.add_argument("--queries", type=int, default=1_000_000)
     mesh.add_argument("--max-dist", type=float, default=1e8)
+    mesh.add_argument("--tolerance", type=float, default=1e-3)
     mesh.set_defaults(func=run_mesh)
 
     hashgrid = subparsers.add_parser("hashgrid")
     add_common(hashgrid)
     hashgrid.add_argument("--points", type=int, default=65_536)
+    hashgrid.add_argument("--replacement-points", type=int, default=1024)
     hashgrid.add_argument("--queries", type=int, default=65_536)
     hashgrid.add_argument("--radius", type=float, default=0.05)
+    hashgrid.add_argument("--replacement-radius", type=float, default=100.0)
     hashgrid.set_defaults(func=run_hashgrid)
 
     return parser
