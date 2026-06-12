@@ -3,16 +3,95 @@
 # SPDX-License-Identifier: Apache-2.0
 """Minimal Warp object-lifetime reproducers.
 
-These tests match the production lifetime shape:
+These tests exercise the Warp spatial-primitive lifetime pitfall where a
+``wp.Mesh`` or ``wp.HashGrid`` is passed to kernels only by its integer ``id``.
+Warp kernels dereference that ID as native device memory; ``wp.launch()`` does
+not retain the Python owner when the kernel argument is just ``mesh.id`` or
+``grid.id``.  Deleting the Python owner can therefore free or recycle the native
+object while queued GPU work still plans to use the ID.
 
-  1. create a wp.Mesh or wp.HashGrid
-  2. enqueue delay work on the same stream
-  3. launch a kernel using mesh.id / grid.id while the object is alive
-  4. delete the Python owner immediately after launch
+Repro modes
+-----------
+
+Default mesh/hashgrid mode tests the production-shaped async lifetime window:
+
+  1. create a ``wp.Mesh`` or ``wp.HashGrid``
+  2. enqueue optional delay work on the same stream
+  3. launch a query kernel while the Python owner is alive
+  4. delete the Python owner immediately after ``wp.launch()``
   5. optionally allocate replacement objects on another stream
-  6. synchronize the stream
+  6. synchronize the query stream
 
-Use --retain-owner as the control case.
+Use ``--retain-owner`` as the safe control.  The owner is kept alive until after
+query-stream synchronization.
+
+Use ``--launch-after-delete`` to test the stronger docs pitfall: keep only
+``mesh.id`` / ``grid.id``, delete the Python owner, optionally churn replacement
+objects, and launch the query after the owner is gone.  This usually shows stale
+ID reuse as wrong-object results.
+
+Use ``mesh --gate-before-query`` to prove the post-launch hazard directly.  This
+launches the query while the ``wp.Mesh`` owner is alive, but the kernel spins on
+a device gate before dereferencing ``mesh.id``.  Python then deletes the owner,
+optionally synchronizes Warp's default-stream free, churns replacement meshes,
+and releases the gate.  This demonstrates that returning from ``wp.launch()`` is
+not a sufficient lifetime boundary; the owner must survive until the kernel has
+finished using the ID.
+
+Illegal-memory-access repro
+---------------------------
+
+Run the unsafe gated mesh repro in a fresh process:
+
+  python warp_object_lifetime_repro.py mesh \
+    --gate-before-query \
+    --warmup-baselines \
+    --queries 1 \
+    --delay-launches 0 \
+    --post-delete-churn 1000 \
+    --replacement-mesh-resolution 96 \
+    --sync-default-stream-after-delete
+
+Expected shape on an H100 with Warp 1.11.1:
+
+  [mesh] warmup retained_original ... sum=0.087999
+  [mesh] warmup retained_replacement ... sum=-1730.910400
+  [mesh] iter=0 launched gated query ...
+  [mesh] deleting wp.Mesh while gated query is spinning
+  [mesh] synchronizing default stream after delete
+  [mesh] post-delete replacement meshes=1000 reused_mesh_id=0
+  [mesh] released query gate
+  torch.AcceleratorError: CUDA error: an illegal memory access was encountered
+
+The exact sums and allocation reuse can vary by GPU, Warp version, allocator
+state, and driver.  A stale-ID run may also manifest as a valid-looking but
+wrong result if the freed ID is reused by a replacement mesh before the gated
+kernel dereferences it.
+
+Matching safe control
+---------------------
+
+  python warp_object_lifetime_repro.py mesh \
+    --retain-owner \
+    --gate-before-query \
+    --warmup-baselines \
+    --queries 1 \
+    --delay-launches 0 \
+    --post-delete-churn 1000 \
+    --replacement-mesh-resolution 96 \
+    --sync-default-stream-after-delete
+
+This should complete successfully and report the retained-original sum.
+
+Notes
+-----
+
+Do not use ``CUDA_LAUNCH_BLOCKING=1`` with ``--gate-before-query``.  The gated
+kernel intentionally spins until Python releases a device gate; blocking launches
+can deadlock before Python reaches the release point.
+
+After a CUDA illegal memory access, treat the process as poisoned.  Run each
+experiment in a fresh Python process.
 """
 
 from __future__ import annotations
@@ -22,6 +101,7 @@ import faulthandler
 import gc
 import os
 import sys
+import time
 from pathlib import Path
 
 SCRIPT_PATH = Path(__file__).resolve()
@@ -62,6 +142,29 @@ def mesh_query_kernel(
     sdf: wp.array(dtype=wp.float32),
 ):
     tid = wp.tid()
+    p = points[tid]
+    res = wp.mesh_query_point_sign_normal(mesh_id, p, max_dist)
+    mesh = wp.mesh_get(mesh_id)
+
+    p0 = mesh.points[mesh.indices[3 * res.face + 0]]
+    p1 = mesh.points[mesh.indices[3 * res.face + 1]]
+    p2 = mesh.points[mesh.indices[3 * res.face + 2]]
+    closest = res.u * p0 + res.v * p1 + (wp.float32(1.0) - res.u - res.v) * p2
+    sdf[tid] = res.sign * wp.length(p - closest)
+
+
+@wp.kernel
+def gated_mesh_query_kernel(
+    mesh_id: wp.uint64,
+    gate: wp.array(dtype=wp.int32),
+    points: wp.array(dtype=wp.vec3),
+    max_dist: wp.float32,
+    sdf: wp.array(dtype=wp.float32),
+):
+    tid = wp.tid()
+    while wp.atomic_add(gate, 0, wp.int32(0)) == wp.int32(0):
+        pass
+
     p = points[tid]
     res = wp.mesh_query_point_sign_normal(mesh_id, p, max_dist)
     mesh = wp.mesh_get(mesh_id)
@@ -175,7 +278,53 @@ def enqueue_delay(args: argparse.Namespace, device: torch.device, wp_stream: wp.
     return buffers
 
 
+def run_mesh_warmup_baselines(
+    args: argparse.Namespace,
+    device: torch.device,
+    vertices: torch.Tensor,
+    faces: torch.Tensor,
+    replacement_vertices: torch.Tensor,
+    replacement_faces: torch.Tensor,
+    query_points: torch.Tensor,
+) -> None:
+    stream = torch.cuda.Stream(device=device)
+    wp_stream = wp.stream_from_torch(stream)
+
+    for label, current_vertices, current_faces in (
+        ("retained_original", vertices, faces),
+        ("retained_replacement", replacement_vertices, replacement_faces),
+    ):
+        out = torch.empty(args.queries, device=device, dtype=torch.float32)
+        gate = torch.ones(1, device=device, dtype=torch.int32)
+        with torch.cuda.stream(stream), wp.ScopedStream(wp_stream):
+            wp_vertices = wp.from_torch(current_vertices, dtype=wp.vec3)
+            wp_faces = wp.from_torch(current_faces.reshape(-1), dtype=wp.int32)
+            wp_queries = wp.from_torch(query_points, dtype=wp.vec3)
+            wp_out = wp.from_torch(out, dtype=wp.float32)
+            wp_gate = wp.from_torch(gate, dtype=wp.int32)
+            mesh = wp.Mesh(points=wp_vertices, indices=wp_faces)
+            mesh_id = int(mesh.id)
+            wp.launch(
+                gated_mesh_query_kernel,
+                dim=args.queries,
+                inputs=[mesh_id, wp_gate, wp_queries, float(args.max_dist), wp_out],
+                stream=wp_stream,
+            )
+        stream.synchronize()
+        print(
+            f"[mesh] warmup {label} mesh_id={mesh_id} sum={float(out.sum().item()):.6f}",
+            flush=True,
+        )
+        del mesh, wp_vertices, wp_faces, wp_queries, wp_out, wp_gate, gate, out
+        gc.collect()
+
+
 def run_mesh(args: argparse.Namespace) -> None:
+    if args.gate_before_query and args.launch_after_delete:
+        raise ValueError("--gate-before-query and --launch-after-delete are mutually exclusive")
+    if args.gate_before_query and args.queries != 1:
+        raise ValueError("Use --queries 1 with --gate-before-query to avoid launching many spinning threads")
+
     device = require_cuda(args.device)
     stream = torch.cuda.Stream(device=device)
     wp_stream = wp.stream_from_torch(stream)
@@ -189,37 +338,78 @@ def run_mesh(args: argparse.Namespace) -> None:
     query_points = make_points(args.queries, device, args.seed)
     expected_sum: float | None = None
 
+    if args.gate_before_query and args.warmup_baselines:
+        run_mesh_warmup_baselines(
+            args,
+            device,
+            vertices,
+            faces,
+            replacement_vertices,
+            replacement_faces,
+            query_points,
+        )
+
     for iteration in range(args.iterations):
         out = torch.empty(args.queries, device=device, dtype=torch.float32)
+        gate = None
+        if args.gate_before_query:
+            gate = torch.zeros(1, device=device, dtype=torch.int32)
 
         with torch.cuda.stream(stream), wp.ScopedStream(wp_stream):
             wp_vertices = wp.from_torch(vertices, dtype=wp.vec3)
             wp_faces = wp.from_torch(faces.reshape(-1), dtype=wp.int32)
             wp_queries = wp.from_torch(query_points, dtype=wp.vec3)
             wp_out = wp.from_torch(out, dtype=wp.float32)
+            wp_gate = wp.from_torch(gate, dtype=wp.int32) if gate is not None else None
 
             mesh = wp.Mesh(points=wp_vertices, indices=wp_faces)
             mesh_id = int(mesh.id)
             delay_buffers = enqueue_delay(args, device, wp_stream)
-            wp.launch(
-                mesh_query_kernel,
-                dim=args.queries,
-                inputs=[mesh_id, wp_queries, float(args.max_dist), wp_out],
-                stream=wp_stream,
-            )
+            if args.gate_before_query:
+                wp.launch(
+                    gated_mesh_query_kernel,
+                    dim=args.queries,
+                    inputs=[mesh_id, wp_gate, wp_queries, float(args.max_dist), wp_out],
+                    stream=wp_stream,
+                )
+            elif not args.launch_after_delete:
+                wp.launch(
+                    mesh_query_kernel,
+                    dim=args.queries,
+                    inputs=[mesh_id, wp_queries, float(args.max_dist), wp_out],
+                    stream=wp_stream,
+                )
 
+        if args.gate_before_query:
+            action = "launched gated query"
+        elif args.launch_after_delete:
+            action = "created object"
+        else:
+            action = "launched query"
         print(
-            f"[mesh] iter={iteration} launched query with mesh_id={mesh_id}; "
+            f"[mesh] iter={iteration} {action} with mesh_id={mesh_id}; "
             f"delay_launches={args.delay_launches} delay_iters={args.delay_iters}",
             flush=True,
         )
 
+        if args.gate_before_query and args.gate_warmup_sec > 0.0:
+            time.sleep(args.gate_warmup_sec)
+
         if args.retain_owner:
             print("[mesh] retaining wp.Mesh until synchronize", flush=True)
         else:
-            print("[mesh] deleting wp.Mesh immediately after launch", flush=True)
+            if args.gate_before_query:
+                when = "while gated query is spinning"
+            elif args.launch_after_delete:
+                when = "before query launch"
+            else:
+                when = "immediately after launch"
+            print(f"[mesh] deleting wp.Mesh {when}", flush=True)
             del mesh
             gc.collect()
+            if args.gate_before_query and args.sync_default_stream_after_delete:
+                print("[mesh] synchronizing default stream after delete", flush=True)
+                torch.cuda.default_stream(device=device).synchronize()
 
         replacement_meshes = []
         if args.post_delete_churn:
@@ -241,6 +431,24 @@ def run_mesh(args: argparse.Namespace) -> None:
                 flush=True,
             )
             pressure_stream.synchronize()
+
+        if args.launch_after_delete:
+            with torch.cuda.stream(stream), wp.ScopedStream(wp_stream):
+                wp.launch(
+                    mesh_query_kernel,
+                    dim=args.queries,
+                    inputs=[mesh_id, wp_queries, float(args.max_dist), wp_out],
+                    stream=wp_stream,
+                )
+            print(
+                f"[mesh] iter={iteration} launched query after "
+                f"{'retaining' if args.retain_owner else 'deleting'} owner",
+                flush=True,
+            )
+
+        if args.gate_before_query:
+            gate.fill_(1)
+            print("[mesh] released query gate", flush=True)
 
         stream.synchronize()
         actual_sum = float(out.sum().item())
@@ -288,15 +496,18 @@ def run_hashgrid(args: argparse.Namespace) -> None:
             grid_id = int(grid.id)
 
             delay_buffers = enqueue_delay(args, device, wp_stream)
-            wp.launch(
-                hashgrid_query_kernel,
-                dim=args.queries,
-                inputs=[grid_id, wp_points, wp_queries, float(args.radius), wp_counts],
-                stream=wp_stream,
-            )
+            if not args.launch_after_delete:
+                wp.launch(
+                    hashgrid_query_kernel,
+                    dim=args.queries,
+                    inputs=[grid_id, wp_points, wp_queries, float(args.radius), wp_counts],
+                    stream=wp_stream,
+                )
 
         print(
-            f"[hashgrid] iter={iteration} launched query with grid_id={grid_id}; "
+            f"[hashgrid] iter={iteration} "
+            f"{'created object' if args.launch_after_delete else 'launched query'} "
+            f"with grid_id={grid_id}; "
             f"delay_launches={args.delay_launches} delay_iters={args.delay_iters}",
             flush=True,
         )
@@ -304,7 +515,8 @@ def run_hashgrid(args: argparse.Namespace) -> None:
         if args.retain_owner:
             print("[hashgrid] retaining wp.HashGrid until synchronize", flush=True)
         else:
-            print("[hashgrid] deleting wp.HashGrid immediately after launch", flush=True)
+            when = "before query launch" if args.launch_after_delete else "immediately after launch"
+            print(f"[hashgrid] deleting wp.HashGrid {when}", flush=True)
             del grid
             gc.collect()
 
@@ -332,6 +544,20 @@ def run_hashgrid(args: argparse.Namespace) -> None:
                 flush=True,
             )
             pressure_stream.synchronize()
+
+        if args.launch_after_delete:
+            with torch.cuda.stream(stream), wp.ScopedStream(wp_stream):
+                wp.launch(
+                    hashgrid_query_kernel,
+                    dim=args.queries,
+                    inputs=[grid_id, wp_points, wp_queries, float(args.radius), wp_counts],
+                    stream=wp_stream,
+                )
+            print(
+                f"[hashgrid] iter={iteration} launched query after "
+                f"{'retaining' if args.retain_owner else 'deleting'} owner",
+                flush=True,
+            )
 
         stream.synchronize()
         count_sum = int(counts.sum().item())
@@ -378,6 +604,14 @@ def add_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Raise if results differ from iteration 0.",
     )
+    parser.add_argument(
+        "--launch-after-delete",
+        action="store_true",
+        help=(
+            "Launch the query after the owner deletion/churn point. This directly "
+            "tests the documented pitfall of keeping only mesh.id / grid.id."
+        ),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -391,6 +625,38 @@ def build_parser() -> argparse.ArgumentParser:
     mesh.add_argument("--queries", type=int, default=1_000_000)
     mesh.add_argument("--max-dist", type=float, default=1e8)
     mesh.add_argument("--tolerance", type=float, default=1e-3)
+    mesh.add_argument(
+        "--gate-before-query",
+        action="store_true",
+        help=(
+            "Launch the query while the mesh owner is alive, but spin inside the "
+            "kernel before dereferencing mesh.id. This adversarially tests deleting "
+            "the owner immediately after wp.launch but before the kernel uses it."
+        ),
+    )
+    mesh.add_argument(
+        "--gate-warmup-sec",
+        type=float,
+        default=0.05,
+        help="Seconds to wait after gated launch before deleting the owner.",
+    )
+    mesh.add_argument(
+        "--sync-default-stream-after-delete",
+        action="store_true",
+        help=(
+            "After deleting the owner in --gate-before-query mode, synchronize the "
+            "CUDA default stream before releasing the gate. This helps complete "
+            "Warp's null-stream cudaFreeAsync before the kernel dereferences mesh.id."
+        ),
+    )
+    mesh.add_argument(
+        "--warmup-baselines",
+        action="store_true",
+        help=(
+            "Before the gated repro, run retained original/replacement mesh queries. "
+            "This changes allocator state and prints the expected safe/replacement sums."
+        ),
+    )
     mesh.set_defaults(func=run_mesh)
 
     hashgrid = subparsers.add_parser("hashgrid")
