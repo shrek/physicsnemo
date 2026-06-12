@@ -9,7 +9,8 @@ These tests match the production lifetime shape:
   2. enqueue delay work on the same stream
   3. launch a kernel using mesh.id / grid.id while the object is alive
   4. delete the Python owner immediately after launch
-  5. synchronize the stream
+  5. optionally allocate replacement objects on another stream
+  6. synchronize the stream
 
 Use --retain-owner as the control case.
 """
@@ -156,6 +157,8 @@ def run_mesh(args: argparse.Namespace) -> None:
     device = require_cuda(args.device)
     stream = torch.cuda.Stream(device=device)
     wp_stream = wp.stream_from_torch(stream)
+    pressure_stream = torch.cuda.Stream(device=device)
+    wp_pressure_stream = wp.stream_from_torch(pressure_stream)
     vertices, faces = make_plane_mesh(args.mesh_resolution, device)
     query_points = make_points(args.queries, device, args.seed)
 
@@ -191,12 +194,26 @@ def run_mesh(args: argparse.Namespace) -> None:
             del mesh
             gc.collect()
 
+        replacement_meshes = []
+        if args.post_delete_churn:
+            with torch.cuda.stream(pressure_stream), wp.ScopedStream(wp_pressure_stream):
+                for _ in range(args.post_delete_churn):
+                    replacement = wp.Mesh(points=wp_vertices, indices=wp_faces)
+                    replacement_meshes.append(replacement)
+            reused = sum(int(replacement.id) == mesh_id for replacement in replacement_meshes)
+            print(
+                f"[mesh] post-delete replacement meshes={len(replacement_meshes)} "
+                f"reused_mesh_id={reused}",
+                flush=True,
+            )
+            pressure_stream.synchronize()
+
         stream.synchronize()
         print(f"[mesh] iter={iteration} survived sum={float(out.sum().item()):.6f}", flush=True)
 
         if args.retain_owner:
             del mesh
-        del delay_buffers, wp_vertices, wp_faces, wp_queries, wp_out
+        del replacement_meshes, delay_buffers, wp_vertices, wp_faces, wp_queries, wp_out
         gc.collect()
 
 
@@ -204,6 +221,8 @@ def run_hashgrid(args: argparse.Namespace) -> None:
     device = require_cuda(args.device)
     stream = torch.cuda.Stream(device=device)
     wp_stream = wp.stream_from_torch(stream)
+    pressure_stream = torch.cuda.Stream(device=device)
+    wp_pressure_stream = wp.stream_from_torch(pressure_stream)
     points = make_points(args.points, device, args.seed)
     queries = make_points(args.queries, device, args.seed + 1)
 
@@ -241,6 +260,27 @@ def run_hashgrid(args: argparse.Namespace) -> None:
             del grid
             gc.collect()
 
+        replacement_grids = []
+        if args.post_delete_churn:
+            with torch.cuda.stream(pressure_stream), wp.ScopedStream(wp_pressure_stream):
+                for _ in range(args.post_delete_churn):
+                    replacement = wp.HashGrid(
+                        dim_x=128,
+                        dim_y=128,
+                        dim_z=128,
+                        device=wp_points.device,
+                    )
+                    replacement.reserve(args.points)
+                    replacement.build(points=wp_points, radius=0.5 * float(args.radius))
+                    replacement_grids.append(replacement)
+            reused = sum(int(replacement.id) == grid_id for replacement in replacement_grids)
+            print(
+                f"[hashgrid] post-delete replacement grids={len(replacement_grids)} "
+                f"reused_grid_id={reused}",
+                flush=True,
+            )
+            pressure_stream.synchronize()
+
         stream.synchronize()
         print(
             f"[hashgrid] iter={iteration} survived count_sum={int(counts.sum().item())}",
@@ -249,7 +289,7 @@ def run_hashgrid(args: argparse.Namespace) -> None:
 
         if args.retain_owner:
             del grid
-        del delay_buffers, wp_points, wp_queries, wp_counts
+        del replacement_grids, delay_buffers, wp_points, wp_queries, wp_counts
         gc.collect()
 
 
@@ -260,6 +300,15 @@ def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--delay-blocks", type=int, default=262_144)
     parser.add_argument("--delay-iters", type=int, default=2048)
     parser.add_argument("--delay-launches", type=int, default=1)
+    parser.add_argument(
+        "--post-delete-churn",
+        type=int,
+        default=0,
+        help=(
+            "After deleting the owner, allocate this many replacement objects "
+            "on another stream before synchronizing the target stream."
+        ),
+    )
     parser.add_argument(
         "--retain-owner",
         action="store_true",
