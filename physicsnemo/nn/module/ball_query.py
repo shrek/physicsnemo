@@ -22,6 +22,8 @@ By default, it will project a grid of points to a 1D set of points.
 Supports arbitrary batch sizes.
 """
 
+import os
+
 import torch
 import torch.nn as nn
 from einops import rearrange
@@ -94,21 +96,27 @@ class BQWarp(nn.Module):
             else:
                 raise ValueError("p_grid must be 3D, 4D, 5D only")
 
+        radius_search_kwargs = {
+            "max_points": self.neighbors_in_radius,
+            "return_points": True,
+        }
+        implementation = os.getenv("PHYSICSNEMO_RADIUS_SEARCH_IMPLEMENTATION")
+        if implementation:
+            radius_search_kwargs["implementation"] = implementation
+
         if reverse_mapping:
             mapping, outputs = radius_search(
                 x,
                 p_grid,
                 self.radius,
-                self.neighbors_in_radius,
-                return_points=True,
+                **radius_search_kwargs,
             )
         else:
             mapping, outputs = radius_search(
                 p_grid,
                 x,
                 self.radius,
-                self.neighbors_in_radius,
-                return_points=True,
+                **radius_search_kwargs,
             )
 
         return mapping, outputs

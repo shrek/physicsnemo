@@ -37,7 +37,7 @@ from .kernels import (
     scatter_add_batched,
     scatter_add_unlimited,
 )
-from .utils import format_returns, validate_inputs
+from .utils import format_returns, maybe_capture_radius_search, validate_inputs
 
 wp.config.quiet = True
 
@@ -208,6 +208,8 @@ def radius_search_impl(
     if points.device != queries.device:
         raise ValueError("points and queries must be on the same device")
 
+    input_points = points
+    input_queries = queries
     points, queries, was_unbatched = validate_inputs(points, queries)
     B = points.shape[0]
     N_queries = queries.shape[1]
@@ -409,6 +411,16 @@ def radius_search_impl(
     # Handle the matrix of return values:
     pts_out = pts_out.to(input_dtype)
     dists_out = dists_out.to(input_dtype)
+    maybe_capture_radius_search(
+        "warp",
+        input_points,
+        input_queries,
+        radius,
+        max_points,
+        return_dists,
+        return_points,
+        num_neighbors=num_neighbors,
+    )
     return indices, pts_out, dists_out, num_neighbors
 
 

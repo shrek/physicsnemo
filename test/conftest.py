@@ -33,13 +33,13 @@ import importlib.util
 import pathlib
 import random
 from collections import defaultdict
-from importlib import metadata
-
 import numpy as np
 import pytest
 import torch
 from packaging.requirements import Requirement
 from packaging.version import Version
+
+from physicsnemo.core.version_check import get_installed_version
 
 NFS_DATA_PATH = "/data/nfs/physicsnemo-data"
 
@@ -184,16 +184,16 @@ def _check_requirement(spec):
 
     Spec may be a plain module name (e.g. "zarr") or a name with version
     specifier (e.g. "zarr>=3.0.0"). Uses packaging.requirements.Requirement
-    for parsing and importlib.metadata for the installed version.
+    for parsing and PhysicsNeMo's variant-aware version lookup for the
+    installed version.
     """
     req = Requirement(spec)
     module_name = req.name
     if importlib.util.find_spec(module_name) is None:
         return False
     if req.specifier:
-        try:
-            installed = metadata.version(module_name)
-        except Exception:
+        installed = get_installed_version(module_name)
+        if installed is None:
             return False
         if Version(installed) not in req.specifier:
             return False

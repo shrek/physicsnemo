@@ -19,7 +19,7 @@ from jaxtyping import Float
 
 from physicsnemo.core.function_spec import FunctionSpec
 
-from ._cupy_tiles_impl import radius_search as radius_search_cupy_tiles
+from ._cupy_tiles_v2_impl import radius_search as radius_search_cupy_tiles_v2
 from ._torch_impl import radius_search as radius_search_torch
 from ._warp_impl import radius_search as radius_search_warp
 
@@ -73,8 +73,7 @@ class RadiusSearch(FunctionSpec):
         return_points (bool, optional): If True, returns the actual neighbor points in addition to
             their indices. Defaults to False.
         implementation (str, optional): Explicit implementation name ("warp", "torch",
-            or experimental "cupy_tiles").
-            Defaults to None, which selects by rank.
+            or experimental "cupy_tiles_v2"). Defaults to None, which selects by rank.
 
     Returns:
         tuple | torch.Tensor:
@@ -132,9 +131,9 @@ class RadiusSearch(FunctionSpec):
         )
 
     @FunctionSpec.register(
-        name="cupy_tiles", required_imports=("cupy>=13.6.0",), rank=2
+        name="cupy_tiles_v2", required_imports=("cupy>=13.6.0",), rank=2
     )
-    def cupy_tiles_forward(
+    def cupy_tiles_v2_forward(
         points: Float[torch.Tensor, "*batch num_points 3"],
         queries: Float[torch.Tensor, "*batch num_queries 3"],
         radius: float,
@@ -142,8 +141,8 @@ class RadiusSearch(FunctionSpec):
         return_dists: bool = False,
         return_points: bool = False,
     ) -> tuple[torch.Tensor, ...]:
-        """Experimental CUDA radius search using persistent spatial query tiles."""
-        return radius_search_cupy_tiles(
+        """Experimental CUDA radius search using contiguous cell bins."""
+        return radius_search_cupy_tiles_v2(
             points, queries, radius, max_points, return_dists, return_points
         )
 
