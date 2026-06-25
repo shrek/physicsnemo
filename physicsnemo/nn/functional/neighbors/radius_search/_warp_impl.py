@@ -27,6 +27,7 @@ from typing import List
 
 import torch
 import warp as wp
+from torch.profiler import record_function
 
 from physicsnemo.core.function_spec import FunctionSpec
 
@@ -733,7 +734,10 @@ def radius_search(
         The formatted radius search results, whose contents depend on
         ``return_dists`` and ``return_points``.
     """
-    indices, points_out, distances, _ = radius_search_impl(
-        points, queries, radius, max_points, return_dists, return_points
-    )
-    return format_returns(indices, points_out, distances, return_dists, return_points)
+    with record_function("physicsnemo::radius_search_warp"):
+        indices, points_out, distances, _ = radius_search_impl(
+            points, queries, radius, max_points, return_dists, return_points
+        )
+        return format_returns(
+            indices, points_out, distances, return_dists, return_points
+        )

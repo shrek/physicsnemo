@@ -30,6 +30,7 @@ import importlib
 from functools import lru_cache
 
 import torch
+from torch.profiler import record_function
 
 from physicsnemo.core.version_check import check_version_spec
 
@@ -634,6 +635,7 @@ def radius_search_impl(
     return indices, points_out, distances
 
 
+@torch.compiler.disable
 def radius_search(
     points: torch.Tensor,
     queries: torch.Tensor,
@@ -643,12 +645,13 @@ def radius_search(
     return_points: bool = False,
 ):
     """CuPy v2 backend entry point for radius search with formatted returns."""
-    indices, points_out, distances = radius_search_impl(
-        points,
-        queries,
-        radius,
-        max_points,
-        return_dists,
-        return_points,
-    )
-    return format_returns(indices, points_out, distances, return_dists, return_points)
+    with record_function("physicsnemo::radius_search_cupy_tiles_v2"):
+        indices, points_out, distances = radius_search_impl(
+            points,
+            queries,
+            radius,
+            max_points,
+            return_dists,
+            return_points,
+        )
+        return format_returns(indices, points_out, distances, return_dists, return_points)
