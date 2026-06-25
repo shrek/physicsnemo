@@ -156,6 +156,90 @@ def test_radius_search_warp(
     )
 
 
+# Validate the experimental CuPy tiled implementation across return modes.
+@requires_module("cupy>=13.6.0")
+@pytest.mark.parametrize("return_dists", [True, False])
+@pytest.mark.parametrize("return_points", [True, False])
+def test_radius_search_cupy_tiles(
+    device: str,
+    return_dists: bool,
+    return_points: bool,
+):
+    if device == "cpu":
+        pytest.skip("cupy_tiles radius_search implementation requires CUDA")
+
+    points, queries = _build_problem(device)
+    radius = 0.17
+    max_points = points.shape[0]
+    results = radius_search(
+        points=points,
+        queries=queries,
+        radius=radius,
+        max_points=max_points,
+        return_dists=return_dists,
+        return_points=return_points,
+        implementation="cupy_tiles",
+    )
+    _assert_radius_outputs(
+        points,
+        queries,
+        radius,
+        max_points,
+        return_dists,
+        return_points,
+        results,
+    )
+
+
+@requires_module("cupy>=13.6.0")
+def test_radius_search_cupy_tiles_forward_parity(device: str):
+    if device == "cpu":
+        pytest.skip("cupy_tiles radius_search implementation requires CUDA")
+
+    torch.manual_seed(42)
+    points = torch.randn(53, 3, device=device)
+    queries = torch.randn(21, 3, device=device)
+    radius = 0.5
+    max_points = points.shape[0]
+
+    output = radius_search(
+        points,
+        queries,
+        radius=radius,
+        max_points=max_points,
+        return_dists=True,
+        return_points=True,
+        implementation="cupy_tiles",
+    )
+    reference = radius_search(
+        points,
+        queries,
+        radius=radius,
+        max_points=max_points,
+        return_dists=True,
+        return_points=True,
+        implementation="torch",
+    )
+
+    RadiusSearch.compare_forward(output, reference)
+
+
+@requires_module("cupy>=13.6.0")
+def test_radius_search_cupy_tiles_requires_static_cuda(device: str):
+    if device == "cpu":
+        pytest.skip("cupy_tiles radius_search implementation requires CUDA")
+
+    points, queries = _build_problem(device)
+    with pytest.raises(ValueError, match="requires max_points"):
+        radius_search(
+            points=points,
+            queries=queries,
+            radius=0.17,
+            max_points=None,
+            implementation="cupy_tiles",
+        )
+
+
 # Validate benchmark input generation contract for radius search.
 def test_radius_search_make_inputs_forward(device: str):
     label, args, kwargs = next(iter(RadiusSearch.make_inputs_forward(device=device)))
