@@ -234,17 +234,17 @@ def test_radius_search_warp(
     )
 
 
-# Validate the experimental CuPy v2 implementation across return modes.
+# Validate the experimental compact-cell-points implementation across return modes.
 @requires_module("cupy>=13.6.0")
 @pytest.mark.parametrize("return_dists", [True, False])
 @pytest.mark.parametrize("return_points", [True, False])
-def test_radius_search_cupy_tiles_v2(
+def test_radius_search_compact_cell_points(
     device: str,
     return_dists: bool,
     return_points: bool,
 ):
     if device == "cpu":
-        pytest.skip("cupy_tiles_v2 radius_search implementation requires CUDA")
+        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
 
     points, queries = _build_problem(device)
     radius = 0.17
@@ -256,7 +256,7 @@ def test_radius_search_cupy_tiles_v2(
         max_points=max_points,
         return_dists=return_dists,
         return_points=return_points,
-        implementation="cupy_tiles_v2",
+        implementation="compact_cell_points",
     )
     _assert_radius_outputs(
         points,
@@ -270,9 +270,9 @@ def test_radius_search_cupy_tiles_v2(
 
 
 @requires_module("cupy>=13.6.0")
-def test_radius_search_cupy_tiles_v2_forward_parity(device: str):
+def test_radius_search_compact_cell_points_forward_parity(device: str):
     if device == "cpu":
-        pytest.skip("cupy_tiles_v2 radius_search implementation requires CUDA")
+        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
 
     torch.manual_seed(42)
     points = torch.randn(53, 3, device=device)
@@ -287,7 +287,7 @@ def test_radius_search_cupy_tiles_v2_forward_parity(device: str):
         max_points=max_points,
         return_dists=True,
         return_points=True,
-        implementation="cupy_tiles_v2",
+        implementation="compact_cell_points",
     )
     reference = radius_search(
         points,
@@ -303,9 +303,9 @@ def test_radius_search_cupy_tiles_v2_forward_parity(device: str):
 
 
 @requires_module("cupy>=13.6.0")
-def test_radius_search_cupy_tiles_v2_exact_untruncated_parity(device: str):
+def test_radius_search_compact_cell_points_exact_untruncated_parity(device: str):
     if device == "cpu":
-        pytest.skip("cupy_tiles_v2 radius_search implementation requires CUDA")
+        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
 
     points = torch.tensor(
         [
@@ -338,7 +338,7 @@ def test_radius_search_cupy_tiles_v2_exact_untruncated_parity(device: str):
         max_points=max_points,
         return_dists=True,
         return_points=True,
-        implementation="cupy_tiles_v2",
+        implementation="compact_cell_points",
     )
     reference = radius_search(
         points,
@@ -355,9 +355,9 @@ def test_radius_search_cupy_tiles_v2_exact_untruncated_parity(device: str):
 
 
 @requires_module("cupy>=13.6.0")
-def test_radius_search_cupy_tiles_v2_batched_exact_parity(device: str):
+def test_radius_search_compact_cell_points_batched_exact_parity(device: str):
     if device == "cpu":
-        pytest.skip("cupy_tiles_v2 radius_search implementation requires CUDA")
+        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
 
     points = torch.tensor(
         [
@@ -403,7 +403,7 @@ def test_radius_search_cupy_tiles_v2_batched_exact_parity(device: str):
         max_points=max_points,
         return_dists=True,
         return_points=True,
-        implementation="cupy_tiles_v2",
+        implementation="compact_cell_points",
     )
     reference = radius_search(
         points,
@@ -421,9 +421,9 @@ def test_radius_search_cupy_tiles_v2_batched_exact_parity(device: str):
 
 @requires_module("cupy>=13.6.0")
 @requires_module("warp")
-def test_radius_search_cupy_tiles_v2_matches_warp_and_brute_force(device: str):
+def test_radius_search_compact_cell_points_matches_warp_and_brute_force(device: str):
     if device == "cpu":
-        pytest.skip("cupy_tiles_v2 radius_search implementation requires CUDA")
+        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
 
     points = torch.tensor(
         [
@@ -468,14 +468,14 @@ def test_radius_search_cupy_tiles_v2_matches_warp_and_brute_force(device: str):
     radius = 0.25
     max_points = points.shape[1]
 
-    cupy_v2_output = radius_search(
+    compact_cell_points_output = radius_search(
         points,
         queries,
         radius=radius,
         max_points=max_points,
         return_dists=True,
         return_points=True,
-        implementation="cupy_tiles_v2",
+        implementation="compact_cell_points",
     )
     warp_output = radius_search(
         points,
@@ -487,14 +487,16 @@ def test_radius_search_cupy_tiles_v2_matches_warp_and_brute_force(device: str):
         implementation="warp",
     )
 
-    _assert_static_exact_neighbors(points, queries, radius, max_points, cupy_v2_output)
+    _assert_static_exact_neighbors(
+        points, queries, radius, max_points, compact_cell_points_output
+    )
     _assert_static_exact_neighbors(points, queries, radius, max_points, warp_output)
 
 
 @requires_module("cupy>=13.6.0")
-def test_radius_search_cupy_tiles_v2_boundary_cases(device: str):
+def test_radius_search_compact_cell_points_boundary_cases(device: str):
     if device == "cpu":
-        pytest.skip("cupy_tiles_v2 radius_search implementation requires CUDA")
+        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
 
     cases = [
         (
@@ -579,7 +581,7 @@ def test_radius_search_cupy_tiles_v2_boundary_cases(device: str):
             max_points=max_points,
             return_dists=True,
             return_points=True,
-            implementation="cupy_tiles_v2",
+            implementation="compact_cell_points",
         )
         _assert_static_exact_neighbors(points, queries, radius, max_points, output)
 
@@ -599,9 +601,9 @@ def test_radius_search_cupy_tiles_v2_boundary_cases(device: str):
 
 
 @requires_module("cupy>=13.6.0")
-def test_radius_search_cupy_tiles_v2_requires_static_cuda(device: str):
+def test_radius_search_compact_cell_points_requires_static_cuda(device: str):
     if device == "cpu":
-        pytest.skip("cupy_tiles_v2 radius_search implementation requires CUDA")
+        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
 
     points, queries = _build_problem(device)
     with pytest.raises(ValueError, match="requires max_points"):
@@ -610,7 +612,7 @@ def test_radius_search_cupy_tiles_v2_requires_static_cuda(device: str):
             queries=queries,
             radius=0.17,
             max_points=None,
-            implementation="cupy_tiles_v2",
+            implementation="compact_cell_points",
         )
 
 

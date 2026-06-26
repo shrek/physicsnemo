@@ -27,6 +27,8 @@ import torch
 
 _CAPTURE_LOCK = threading.Lock()
 _CAPTURE_COUNT = 0
+_TIMING_LOCK = threading.Lock()
+_TIMING_EVENTS: list[tuple[str, Any, Any]] = []
 
 
 def _env_int(name: str, default: int) -> int:
@@ -37,6 +39,88 @@ def _env_int(name: str, default: int) -> int:
         return int(value)
     except ValueError:
         return default
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
+def radius_search_timing_enabled() -> bool:
+    return _env_flag("PHYSICSNEMO_RADIUS_SEARCH_TIMING")
+
+
+class _RadiusSearchTimer:
+    def __init__(self, implementation: str):
+        self.implementation = implementation
+        self.start_event: Any | None = None
+        self.end_event: Any | None = None
+
+    def __enter__(self):
+        if not radius_search_timing_enabled():
+            return self
+        if not torch.cuda.is_available():
+            return self
+        if getattr(torch.compiler, "is_compiling", lambda: False)():
+            return self
+
+        self.start_event = torch.cuda.Event(enable_timing=True)
+        self.end_event = torch.cuda.Event(enable_timing=True)
+        self.start_event.record()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.start_event is not None and self.end_event is not None:
+            self.end_event.record()
+            with _TIMING_LOCK:
+                _TIMING_EVENTS.append(
+                    (self.implementation, self.start_event, self.end_event)
+                )
+        return False
+
+
+def time_radius_search(implementation: str) -> _RadiusSearchTimer:
+    return _RadiusSearchTimer(implementation)
+
+
+def reset_radius_search_timing() -> None:
+    with _TIMING_LOCK:
+        _TIMING_EVENTS.clear()
+
+
+def summarize_radius_search_timing() -> dict[str, float | int]:
+    with _TIMING_LOCK:
+        events = list(_TIMING_EVENTS)
+        _TIMING_EVENTS.clear()
+
+    summary: dict[str, float | int] = {
+        "neighbor_search_ms": 0.0,
+        "neighbor_search_calls": 0,
+    }
+    if not events:
+        return summary
+
+    for _, _, end_event in events:
+        end_event.synchronize()
+
+    by_impl_ms: dict[str, float] = {}
+    by_impl_calls: dict[str, int] = {}
+    total_ms = 0.0
+    for implementation, start_event, end_event in events:
+        elapsed_ms = float(start_event.elapsed_time(end_event))
+        total_ms += elapsed_ms
+        by_impl_ms[implementation] = by_impl_ms.get(implementation, 0.0) + elapsed_ms
+        by_impl_calls[implementation] = by_impl_calls.get(implementation, 0) + 1
+
+    summary["neighbor_search_ms"] = total_ms
+    summary["neighbor_search_calls"] = len(events)
+    for implementation, elapsed_ms in sorted(by_impl_ms.items()):
+        key = implementation.replace("-", "_")
+        summary[f"neighbor_search_{key}_ms"] = elapsed_ms
+        summary[f"neighbor_search_{key}_calls"] = by_impl_calls[implementation]
+    return summary
 
 
 def _capture_enabled_for(implementation: str) -> bool:

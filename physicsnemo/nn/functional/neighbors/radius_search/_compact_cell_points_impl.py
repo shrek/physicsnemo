@@ -15,13 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Experimental CuPy/CUDA radius-search v2 backend.
+"""Experimental compact-cell-points CUDA radius-search backend.
 
 This variant targets the static training path used by GeoTransolver:
 ``max_points`` is set, ``return_points=True`` is common, and first-found early
-exit is acceptable. It avoids linked-list traversal by building contiguous cell
-bins with a GPU hash table, prefix sum, and scatter, then assigns one warp to
-one query and scans candidate bins cooperatively.
+exit is acceptable. It avoids linked-list traversal by compacting points into
+contiguous per-cell bins with a GPU hash table, prefix sum, and scatter, then
+assigns one warp to one query and scans candidate bins cooperatively.
 """
 
 from __future__ import annotations
@@ -34,7 +34,12 @@ from torch.profiler import record_function
 
 from physicsnemo.core.version_check import check_version_spec
 
-from .utils import format_returns, maybe_capture_radius_search, validate_inputs
+from .utils import (
+    format_returns,
+    maybe_capture_radius_search,
+    time_radius_search,
+    validate_inputs,
+)
 
 CUPY_AVAILABLE = check_version_spec("cupy", "13.6.0", hard_fail=False)
 
@@ -355,7 +360,7 @@ void radius_search_v2(
 def _get_radius_search_v2_kernels():
     if cp is None:
         raise ImportError(
-            "physicsnemo radius_search cupy_tiles_v2 implementation requires "
+            "physicsnemo radius_search compact_cell_points implementation requires "
             "cupy>=13.6.0"
         )
     module = cp.RawModule(
@@ -377,7 +382,7 @@ def _get_radius_search_v2_kernels():
 def _require_cupy() -> None:
     if cp is None:
         raise ImportError(
-            "physicsnemo radius_search cupy_tiles_v2 implementation requires "
+            "physicsnemo radius_search compact_cell_points implementation requires "
             "cupy>=13.6.0"
         )
 
@@ -438,9 +443,9 @@ def radius_search_impl(
     if points.device != queries.device:
         raise ValueError("points and queries must be on the same device")
     if points.device.type != "cuda":
-        raise ValueError("cupy_tiles_v2 radius_search implementation requires CUDA input")
+        raise ValueError("compact_cell_points radius_search implementation requires CUDA input")
     if max_points is None:
-        raise ValueError("cupy_tiles_v2 radius_search implementation requires max_points")
+        raise ValueError("compact_cell_points radius_search implementation requires max_points")
     if max_points <= 0:
         raise ValueError(f"max_points must be positive, got {max_points}")
     if radius <= 0:
@@ -450,7 +455,7 @@ def radius_search_impl(
     input_queries = queries
     points, queries, was_unbatched = validate_inputs(points, queries)
     if points.shape[-1] != 3 or queries.shape[-1] != 3:
-        raise ValueError("cupy_tiles_v2 radius_search implementation requires 3D points")
+        raise ValueError("compact_cell_points radius_search implementation requires 3D points")
 
     points_kernel = points.to(torch.float32) if points.dtype != torch.float32 else points
     queries_kernel = queries.to(torch.float32) if queries.dtype != torch.float32 else queries
@@ -623,7 +628,7 @@ def radius_search_impl(
             distances = distances.squeeze(0)
 
     maybe_capture_radius_search(
-        "cupy_tiles_v2",
+        "compact_cell_points",
         input_points,
         input_queries,
         radius,
@@ -644,8 +649,11 @@ def radius_search(
     return_dists: bool = False,
     return_points: bool = False,
 ):
-    """CuPy v2 backend entry point for radius search with formatted returns."""
-    with record_function("physicsnemo::radius_search_cupy_tiles_v2"):
+    """compact_cell_points backend entry point for radius search with formatted returns."""
+    with (
+        record_function("physicsnemo::radius_search_compact_cell_points"),
+        time_radius_search("compact_cell_points"),
+    ):
         indices, points_out, distances = radius_search_impl(
             points,
             queries,

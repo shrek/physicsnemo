@@ -38,7 +38,7 @@ from .kernels import (
     scatter_add_batched,
     scatter_add_unlimited,
 )
-from .utils import format_returns, maybe_capture_radius_search, validate_inputs
+from .utils import format_returns, maybe_capture_radius_search, time_radius_search, validate_inputs
 
 wp.config.quiet = True
 
@@ -226,192 +226,193 @@ def radius_search_impl(
     # Compute follows data.
     wp_launch_device, wp_launch_stream = FunctionSpec.warp_launch_context(points)
 
-    with wp.ScopedStream(wp_launch_stream):
-        # Build one hash grid per batch element (Python loop)
-        grids = []
-        wp_points_per_b = []
-        wp_queries_per_b = []
-        for b in range(B):
-            pts_b = points[b].contiguous()
-            qrs_b = queries[b].contiguous()
-            wp_pts_b = wp.from_torch(pts_b, dtype=wp.vec3)
-            wp_qrs_b = wp.from_torch(qrs_b, dtype=wp.vec3, return_ctype=True)
-            grid = wp.HashGrid(dim_x=128, dim_y=128, dim_z=128, device=wp_pts_b.device)
-            grid.reserve(N_queries)
-            grid.build(points=wp_pts_b, radius=0.5 * radius)
-            grids.append(grid)
-            wp_points_per_b.append(wp_pts_b)
-            wp_queries_per_b.append(wp_qrs_b)
-
-        if max_points is None:
-            # ---------------------------------------------------------------
-            # Dynamic output path: per-element count, single sync, then gather
-            # ---------------------------------------------------------------
-
-            # Count pass: collect all counts without syncing individually
-            count_tensors = []
-            wp_offsets = []
+    with time_radius_search("warp"):
+        with wp.ScopedStream(wp_launch_stream):
+            # Build one hash grid per batch element (Python loop)
+            grids = []
+            wp_points_per_b = []
+            wp_queries_per_b = []
             for b in range(B):
-                count_t, wp_off = count_neighbors(
-                    grids[b],
-                    wp_points_per_b[b],
-                    wp_queries_per_b[b],
-                    wp_launch_device,
-                    wp_launch_stream,
-                    radius,
-                    N_queries,
-                    sync=(B == 1),
-                )
-                count_tensors.append(count_t)
-                wp_offsets.append(wp_off)
+                pts_b = points[b].contiguous()
+                qrs_b = queries[b].contiguous()
+                wp_pts_b = wp.from_torch(pts_b, dtype=wp.vec3)
+                wp_qrs_b = wp.from_torch(qrs_b, dtype=wp.vec3, return_ctype=True)
+                grid = wp.HashGrid(dim_x=128, dim_y=128, dim_z=128, device=wp_pts_b.device)
+                grid.reserve(N_queries)
+                grid.build(points=wp_pts_b, radius=0.5 * radius)
+                grids.append(grid)
+                wp_points_per_b.append(wp_pts_b)
+                wp_queries_per_b.append(wp_qrs_b)
 
-            # Sync: for B==1 count_tensors[0] is already an int;
-            # for B>1 we batch-sync all GPU tensors at once
-            if B == 1:
-                total_counts = [count_tensors[0]]
+            if max_points is None:
+                # ---------------------------------------------------------------
+                # Dynamic output path: per-element count, single sync, then gather
+                # ---------------------------------------------------------------
+
+                # Count pass: collect all counts without syncing individually
+                count_tensors = []
+                wp_offsets = []
+                for b in range(B):
+                    count_t, wp_off = count_neighbors(
+                        grids[b],
+                        wp_points_per_b[b],
+                        wp_queries_per_b[b],
+                        wp_launch_device,
+                        wp_launch_stream,
+                        radius,
+                        N_queries,
+                        sync=(B == 1),
+                    )
+                    count_tensors.append(count_t)
+                    wp_offsets.append(wp_off)
+
+                # Sync: for B==1 count_tensors[0] is already an int;
+                # for B>1 we batch-sync all GPU tensors at once
+                if B == 1:
+                    total_counts = [count_tensors[0]]
+                else:
+                    gpu_counts = torch.cat(count_tensors, dim=0)
+                    pin_memory = torch.cuda.is_available()
+                    cpu_counts = torch.zeros(B, dtype=torch.int32, pin_memory=pin_memory)
+                    cpu_counts.copy_(gpu_counts)
+                    total_counts = cpu_counts.tolist()
+
+                for tc in total_counts:
+                    if not tc < 2**31 - 1:
+                        raise RuntimeError(
+                            f"Total found neighbors is too large: {tc} >= 2**31 - 1"
+                        )
+
+                # Gather per batch element, concatenate with batch indices
+                all_indices = []
+                all_pts = []
+                all_dists = []
+                for b in range(B):
+                    idx_b, pts_b, dist_b, _ = gather_neighbors(
+                        grids[b],
+                        points.device,
+                        wp_points_per_b[b],
+                        wp_queries_per_b[b],
+                        wp_offsets[b],
+                        wp_launch_device,
+                        wp_launch_stream,
+                        radius,
+                        N_queries,
+                        return_dists,
+                        return_points,
+                        total_counts[b],
+                    )
+                    # idx_b: (2, count_b); prepend batch-index row
+                    batch_row = torch.full(
+                        (1, idx_b.shape[1]),
+                        b,
+                        dtype=idx_b.dtype,
+                        device=idx_b.device,
+                    )
+                    all_indices.append(torch.cat([batch_row, idx_b], dim=0))
+                    all_pts.append(pts_b)
+                    all_dists.append(dist_b)
+
+                indices = torch.cat(all_indices, dim=1)  # (3, total)
+                pts_out = torch.cat(all_pts, dim=0) if return_points else all_pts[0]
+                dists_out = torch.cat(all_dists, dim=0) if return_dists else all_dists[0]
+                num_neighbors = torch.empty(0, dtype=torch.int32, device=points.device)
+
+                if was_unbatched:
+                    # Strip the batch-index row to restore (2, count) format
+                    indices = indices[1:]
+
             else:
-                gpu_counts = torch.cat(count_tensors, dim=0)
-                pin_memory = torch.cuda.is_available()
-                cpu_counts = torch.zeros(B, dtype=torch.int32, pin_memory=pin_memory)
-                cpu_counts.copy_(gpu_counts)
-                total_counts = cpu_counts.tolist()
+                # ---------------------------------------------------------------
+                # Deterministic output path: always use batched 2D kernel launch
+                # ---------------------------------------------------------------
 
-            for tc in total_counts:
-                if not tc < 2**31 - 1:
-                    raise RuntimeError(
-                        f"Total found neighbors is too large: {tc} >= 2**31 - 1"
+                # Build warp array of grid IDs
+                grid_ids_tensor = torch.tensor(
+                    [g.id for g in grids], dtype=torch.int64, device=points.device
+                )
+                wp_grid_ids = wp.from_torch(
+                    grid_ids_tensor, dtype=wp.uint64, return_ctype=True
+                )
+
+                # Convert batched points/queries to warp 2D arrays
+                wp_points_2d = wp.from_torch(
+                    points.contiguous(), dtype=wp.vec3, return_ctype=True
+                )
+                wp_queries_2d = wp.from_torch(
+                    queries.contiguous(), dtype=wp.vec3, return_ctype=True
+                )
+
+                # Allocate outputs with batch dimension
+                indices = torch.full(
+                    (B, N_queries, max_points),
+                    0,
+                    dtype=torch.int32,
+                    device=points.device,
+                )
+                num_neighbors = torch.zeros(
+                    (B, N_queries),
+                    dtype=torch.int32,
+                    device=points.device,
+                )
+                if return_dists:
+                    dists_out = torch.zeros(
+                        (B, N_queries, max_points),
+                        dtype=torch.float32,
+                        device=points.device,
+                    )
+                else:
+                    dists_out = torch.empty(
+                        0,
+                        dtype=torch.float32,
+                        device=points.device,
+                    )
+                if return_points:
+                    pts_out = torch.zeros(
+                        (B, N_queries, max_points, 3),
+                        dtype=torch.float32,
+                        device=points.device,
+                    )
+                else:
+                    pts_out = torch.empty(
+                        (0, max_points, 3),
+                        dtype=torch.float32,
+                        device=points.device,
                     )
 
-            # Gather per batch element, concatenate with batch indices
-            all_indices = []
-            all_pts = []
-            all_dists = []
-            for b in range(B):
-                idx_b, pts_b, dist_b, _ = gather_neighbors(
-                    grids[b],
-                    points.device,
-                    wp_points_per_b[b],
-                    wp_queries_per_b[b],
-                    wp_offsets[b],
-                    wp_launch_device,
-                    wp_launch_stream,
-                    radius,
-                    N_queries,
-                    return_dists,
-                    return_points,
-                    total_counts[b],
-                )
-                # idx_b: (2, count_b); prepend batch-index row
-                batch_row = torch.full(
-                    (1, idx_b.shape[1]),
-                    b,
-                    dtype=idx_b.dtype,
-                    device=idx_b.device,
-                )
-                all_indices.append(torch.cat([batch_row, idx_b], dim=0))
-                all_pts.append(pts_b)
-                all_dists.append(dist_b)
-
-            indices = torch.cat(all_indices, dim=1)  # (3, total)
-            pts_out = torch.cat(all_pts, dim=0) if return_points else all_pts[0]
-            dists_out = torch.cat(all_dists, dim=0) if return_dists else all_dists[0]
-            num_neighbors = torch.empty(0, dtype=torch.int32, device=points.device)
-
-            if was_unbatched:
-                # Strip the batch-index row to restore (2, count) format
-                indices = indices[1:]
-
-        else:
-            # ---------------------------------------------------------------
-            # Deterministic output path: always use batched 2D kernel launch
-            # ---------------------------------------------------------------
-
-            # Build warp array of grid IDs
-            grid_ids_tensor = torch.tensor(
-                [g.id for g in grids], dtype=torch.int64, device=points.device
-            )
-            wp_grid_ids = wp.from_torch(
-                grid_ids_tensor, dtype=wp.uint64, return_ctype=True
-            )
-
-            # Convert batched points/queries to warp 2D arrays
-            wp_points_2d = wp.from_torch(
-                points.contiguous(), dtype=wp.vec3, return_ctype=True
-            )
-            wp_queries_2d = wp.from_torch(
-                queries.contiguous(), dtype=wp.vec3, return_ctype=True
-            )
-
-            # Allocate outputs with batch dimension
-            indices = torch.full(
-                (B, N_queries, max_points),
-                0,
-                dtype=torch.int32,
-                device=points.device,
-            )
-            num_neighbors = torch.zeros(
-                (B, N_queries),
-                dtype=torch.int32,
-                device=points.device,
-            )
-            if return_dists:
-                dists_out = torch.zeros(
-                    (B, N_queries, max_points),
-                    dtype=torch.float32,
-                    device=points.device,
-                )
-            else:
-                dists_out = torch.empty(
-                    0,
-                    dtype=torch.float32,
-                    device=points.device,
-                )
-            if return_points:
-                pts_out = torch.zeros(
-                    (B, N_queries, max_points, 3),
-                    dtype=torch.float32,
-                    device=points.device,
-                )
-            else:
-                pts_out = torch.empty(
-                    (0, max_points, 3),
-                    dtype=torch.float32,
-                    device=points.device,
+                wp.launch(
+                    kernel=radius_search_limited_select_batched,
+                    dim=(B, N_queries),
+                    inputs=[
+                        wp_grid_ids,
+                        wp_points_2d,
+                        wp_queries_2d,
+                        max_points,
+                        radius,
+                        wp.from_torch(indices, return_ctype=True),
+                        wp.from_torch(num_neighbors, return_ctype=True),
+                        return_dists,
+                        wp.from_torch(dists_out, return_ctype=True),
+                        return_points,
+                        wp.from_torch(pts_out, return_ctype=True)
+                        if return_points
+                        else None,
+                    ],
+                    stream=wp_launch_stream,
+                    device=wp_launch_device,
                 )
 
-            wp.launch(
-                kernel=radius_search_limited_select_batched,
-                dim=(B, N_queries),
-                inputs=[
-                    wp_grid_ids,
-                    wp_points_2d,
-                    wp_queries_2d,
-                    max_points,
-                    radius,
-                    wp.from_torch(indices, return_ctype=True),
-                    wp.from_torch(num_neighbors, return_ctype=True),
-                    return_dists,
-                    wp.from_torch(dists_out, return_ctype=True),
-                    return_points,
-                    wp.from_torch(pts_out, return_ctype=True)
-                    if return_points
-                    else None,
-                ],
-                stream=wp_launch_stream,
-                device=wp_launch_device,
-            )
+                if was_unbatched:
+                    indices = indices.squeeze(0)
+                    num_neighbors = num_neighbors.squeeze(0)
+                    if return_dists:
+                        dists_out = dists_out.squeeze(0)
+                    if return_points:
+                        pts_out = pts_out.squeeze(0)
 
-            if was_unbatched:
-                indices = indices.squeeze(0)
-                num_neighbors = num_neighbors.squeeze(0)
-                if return_dists:
-                    dists_out = dists_out.squeeze(0)
-                if return_points:
-                    pts_out = pts_out.squeeze(0)
-
-    # Handle the matrix of return values:
-    pts_out = pts_out.to(input_dtype)
-    dists_out = dists_out.to(input_dtype)
+        # Handle the matrix of return values:
+        pts_out = pts_out.to(input_dtype)
+        dists_out = dists_out.to(input_dtype)
     maybe_capture_radius_search(
         "warp",
         input_points,

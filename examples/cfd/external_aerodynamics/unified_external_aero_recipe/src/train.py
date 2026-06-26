@@ -75,6 +75,11 @@ from physicsnemo.distributed import DistributedManager
 from physicsnemo.mesh import MESH_FIELD_ASSOCIATIONS, DomainMesh, Mesh
 from physicsnemo.utils import load_checkpoint, save_checkpoint
 from physicsnemo.utils.logging import PythonLogger, RankZeroLoggingWrapper
+from physicsnemo.nn.functional.neighbors.radius_search.utils import (
+    radius_search_timing_enabled,
+    reset_radius_search_timing,
+    summarize_radius_search_timing,
+)
 from physicsnemo.utils.profiling import Profiler, profile
 
 te = OptionalImport("transformer_engine.pytorch")
@@ -385,11 +390,14 @@ def _run_epoch(
     precision = getattr(cfg, "precision", "float32")
     n_batches = 0
     num_steps = len(dataloader)
+    collect_radius_timing = radius_search_timing_enabled()
     epoch_t0 = time.perf_counter()
 
     with grad_ctx:
         step_t0 = time.perf_counter()
         for i, batch in enumerate(dataloader):
+            if collect_radius_timing:
+                reset_radius_search_timing()
             batch = _recursive_to_device(batch, dist_manager.device)
 
             loss, losses, metrics = forward_pass(
@@ -431,6 +439,9 @@ def _run_epoch(
             ### Per-step sync for the print line; lands after backward +
             ### optimizer.step so it overlaps with queued GPU work.
             this_loss = loss.detach().item()
+            neighbor_search_timing = (
+                summarize_radius_search_timing() if collect_radius_timing else {}
+            )
             total_loss += this_loss
 
             step_dt = time.perf_counter() - step_t0
@@ -442,10 +453,17 @@ def _run_epoch(
             ### Train mode includes Mem in the per-step line; val drops it
             ### because the no_grad path is the lowest-noise place to look.
             mem_str = f" Mem: {mem_gb:.2f}GB" if is_train else ""
+            neighbor_str = (
+                f" NeighborSearch: "
+                f"{neighbor_search_timing.get('neighbor_search_ms', 0.0):.3f}ms"
+                if collect_radius_timing
+                else ""
+            )
             logger.info(
                 f"{log_prefix} {epoch} [{i + 1}/{num_steps}] "
                 f"Loss: {this_loss:.6f} "
                 f"Step: {step_dt:.3f}s"
+                f"{neighbor_str}"
                 f"{mem_str}"
             )
 
@@ -488,10 +506,13 @@ def _run_epoch(
                         log_jsonl(
                             {
                                 "phase": "step",
+                                "epoch": epoch,
+                                "step": i,
                                 "global_step": global_step,
                                 "loss": this_loss,
                                 "mem_gb": mem_gb,
                                 "step_time_s": step_dt,
+                                **neighbor_search_timing,
                                 **losses_floats,
                                 **metrics_floats,
                             }
@@ -512,6 +533,7 @@ def _run_epoch(
                             "val_step": i,
                             "loss": this_loss,
                             "step_time_s": step_dt,
+                            **neighbor_search_timing,
                             **losses_floats,
                             **metrics_floats,
                         }
