@@ -616,6 +616,227 @@ def test_radius_search_compact_cell_points_requires_static_cuda(device: str):
         )
 
 
+# Validate the experimental Morton-sorted implementation across return modes.
+@requires_module("cupy>=13.6.0")
+@pytest.mark.parametrize("return_dists", [True, False])
+@pytest.mark.parametrize("return_points", [True, False])
+def test_radius_search_morton_cell_points(
+    device: str,
+    return_dists: bool,
+    return_points: bool,
+):
+    if device == "cpu":
+        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
+
+    points, queries = _build_problem(device)
+    radius = 0.17
+    max_points = points.shape[0]
+    results = radius_search(
+        points=points,
+        queries=queries,
+        radius=radius,
+        max_points=max_points,
+        return_dists=return_dists,
+        return_points=return_points,
+        implementation="morton_cell_points",
+    )
+    _assert_radius_outputs(
+        points,
+        queries,
+        radius,
+        max_points,
+        return_dists,
+        return_points,
+        results,
+    )
+
+
+@requires_module("cupy>=13.6.0")
+def test_radius_search_morton_cell_points_exact_untruncated_parity(device: str):
+    if device == "cpu":
+        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
+
+    points = torch.tensor(
+        [
+            [10.0, 10.0, 10.0],
+            [0.10, 0.00, 0.00],
+            [0.00, 0.20, 0.00],
+            [1.20, 0.00, 0.00],
+            [2.05, 0.00, 0.00],
+            [2.00, 0.25, 0.00],
+            [-0.25, 0.00, 0.00],
+            [0.00, 0.00, 0.35],
+        ],
+        device=device,
+    )
+    queries = torch.tensor(
+        [
+            [0.00, 0.00, 0.00],
+            [2.00, 0.00, 0.00],
+            [5.00, 5.00, 5.00],
+        ],
+        device=device,
+    )
+    radius = 0.30
+    max_points = 5
+
+    output = radius_search(
+        points,
+        queries,
+        radius=radius,
+        max_points=max_points,
+        return_dists=True,
+        return_points=True,
+        implementation="morton_cell_points",
+    )
+    reference = radius_search(
+        points,
+        queries,
+        radius=radius,
+        max_points=max_points,
+        return_dists=True,
+        return_points=True,
+        implementation="torch",
+    )
+
+    _assert_static_exact_neighbors(points, queries, radius, max_points, output)
+    _assert_static_exact_neighbors(points, queries, radius, max_points, reference)
+
+
+@requires_module("cupy>=13.6.0")
+def test_radius_search_morton_cell_points_batched_exact_parity(device: str):
+    if device == "cpu":
+        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
+
+    points = torch.tensor(
+        [
+            [
+                [0.10, 0.00, 0.00],
+                [-0.20, 0.00, 0.00],
+                [2.05, 0.00, 0.00],
+                [1.05, 0.00, 0.00],
+                [7.00, 7.00, 7.00],
+            ],
+            [
+                [5.00, 5.00, 5.00],
+                [1.10, 0.00, 0.00],
+                [1.25, 0.00, 0.00],
+                [0.05, 0.00, 0.00],
+                [-2.20, 0.00, 0.00],
+            ],
+        ],
+        device=device,
+    )
+    queries = torch.tensor(
+        [
+            [
+                [0.00, 0.00, 0.00],
+                [2.00, 0.00, 0.00],
+                [8.00, 8.00, 8.00],
+            ],
+            [
+                [1.00, 0.00, 0.00],
+                [-2.00, 0.00, 0.00],
+                [0.00, 4.00, 0.00],
+            ],
+        ],
+        device=device,
+    )
+    radius = 0.30
+    max_points = 4
+
+    output = radius_search(
+        points,
+        queries,
+        radius=radius,
+        max_points=max_points,
+        return_dists=True,
+        return_points=True,
+        implementation="morton_cell_points",
+    )
+    _assert_static_exact_neighbors(points, queries, radius, max_points, output)
+
+
+@requires_module("cupy>=13.6.0")
+def test_radius_search_morton_cell_points_boundary_cases(device: str):
+    if device == "cpu":
+        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
+
+    cases = [
+        (
+            torch.tensor(
+                [
+                    [0.50, 0.00, 0.00],
+                    [0.5001, 0.00, 0.00],
+                    [0.4999, 0.00, 0.00],
+                    [-0.50, 0.00, 0.00],
+                    [-0.5001, 0.00, 0.00],
+                    [0.00, 0.50, 0.00],
+                    [0.00, 0.00, -0.50],
+                ],
+                device=device,
+            ),
+            torch.tensor([[0.00, 0.00, 0.00]], device=device),
+            0.50,
+            5,
+        ),
+        (
+            torch.tensor(
+                [
+                    [-1.25, -1.00, -1.00],
+                    [-0.75, -1.00, -1.00],
+                    [-1.00, -1.251, -1.00],
+                    [-3.00, -3.00, -3.00],
+                ],
+                device=device,
+            ),
+            torch.tensor([[-1.00, -1.00, -1.00]], device=device),
+            0.25,
+            3,
+        ),
+        (
+            torch.empty((0, 3), device=device),
+            torch.tensor([[0.00, 0.00, 0.00], [1.00, 0.00, 0.00]], device=device),
+            0.50,
+            3,
+        ),
+        (
+            torch.tensor([[0.00, 0.00, 0.00], [1.00, 0.00, 0.00]], device=device),
+            torch.empty((0, 3), device=device),
+            0.50,
+            3,
+        ),
+    ]
+
+    for points, queries, radius, max_points in cases:
+        output = radius_search(
+            points,
+            queries,
+            radius=radius,
+            max_points=max_points,
+            return_dists=True,
+            return_points=True,
+            implementation="morton_cell_points",
+        )
+        _assert_static_exact_neighbors(points, queries, radius, max_points, output)
+
+
+@requires_module("cupy>=13.6.0")
+def test_radius_search_morton_cell_points_requires_static_cuda(device: str):
+    if device == "cpu":
+        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
+
+    points, queries = _build_problem(device)
+    with pytest.raises(ValueError, match="requires max_points"):
+        radius_search(
+            points=points,
+            queries=queries,
+            radius=0.17,
+            max_points=None,
+            implementation="morton_cell_points",
+        )
+
+
 # Validate benchmark input generation contract for radius search.
 def test_radius_search_make_inputs_forward(device: str):
     label, args, kwargs = next(iter(RadiusSearch.make_inputs_forward(device=device)))

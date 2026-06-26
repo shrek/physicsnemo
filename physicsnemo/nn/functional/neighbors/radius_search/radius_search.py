@@ -20,6 +20,7 @@ from jaxtyping import Float
 from physicsnemo.core.function_spec import FunctionSpec
 
 from ._compact_cell_points_impl import radius_search as radius_search_compact_cell_points
+from ._morton_cell_points_impl import radius_search as radius_search_morton_cell_points
 from ._torch_impl import radius_search as radius_search_torch
 from ._warp_impl import radius_search as radius_search_warp
 
@@ -73,7 +74,8 @@ class RadiusSearch(FunctionSpec):
         return_points (bool, optional): If True, returns the actual neighbor points in addition to
             their indices. Defaults to False.
         implementation (str, optional): Explicit implementation name ("warp", "torch",
-            or experimental "compact_cell_points"). Defaults to None, which selects by rank.
+            or experimental "compact_cell_points" / "morton_cell_points"). Defaults
+            to None, which selects by rank.
 
     Returns:
         tuple | torch.Tensor:
@@ -159,6 +161,22 @@ class RadiusSearch(FunctionSpec):
     ) -> tuple[torch.Tensor, ...]:
         """Deprecated alias for ``compact_cell_points``."""
         return radius_search_compact_cell_points(
+            points, queries, radius, max_points, return_dists, return_points
+        )
+
+    @FunctionSpec.register(
+        name="morton_cell_points", required_imports=("cupy>=13.6.0",), rank=4
+    )
+    def morton_cell_points_forward(
+        points: Float[torch.Tensor, "*batch num_points 3"],
+        queries: Float[torch.Tensor, "*batch num_queries 3"],
+        radius: float,
+        max_points: int | None = None,
+        return_dists: bool = False,
+        return_points: bool = False,
+    ) -> tuple[torch.Tensor, ...]:
+        """Experimental CUDA radius search using Morton-sorted compact cell bins."""
+        return radius_search_morton_cell_points(
             points, queries, radius, max_points, return_dists, return_points
         )
 
