@@ -19,9 +19,13 @@
 
 This variant targets the static training path used by GeoTransolver:
 ``max_points`` is set, ``return_points=True`` is common, and first-found early
-exit is acceptable. It avoids linked-list traversal by compacting points into
-contiguous per-cell bins with a GPU hash table, prefix sum, and scatter, then
-assigns one warp to one query and scans candidate bins cooperatively.
+exit is acceptable. 
+It does the following:
+    1) map points to radius sized spatial cells
+    2) inserts occupied cells into a hash table
+    3) prefix sums cell count scatters points in each cell into a compact contiguous array
+    4) performs neighbor search using a warp per query point
+
 """
 
 from __future__ import annotations
