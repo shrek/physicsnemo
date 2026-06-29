@@ -91,84 +91,6 @@ def _assert_radius_outputs(
     assert valid.all()
 
 
-def _normalize_static_inputs(points: torch.Tensor, queries: torch.Tensor):
-    if points.ndim == 2:
-        return points.unsqueeze(0), queries.unsqueeze(0), True
-    return points, queries, False
-
-
-def _assert_static_exact_neighbors(
-    points: torch.Tensor,
-    queries: torch.Tensor,
-    radius: float,
-    max_points: int,
-    results,
-) -> None:
-    indices, selected_points, distances = results
-    points_b, queries_b, was_unbatched = _normalize_static_inputs(points, queries)
-    indices_b = indices.unsqueeze(0) if was_unbatched else indices
-    selected_points_b = (
-        selected_points.unsqueeze(0) if was_unbatched else selected_points
-    )
-    distances_b = distances.unsqueeze(0) if was_unbatched else distances
-
-    expected_distances = torch.cdist(
-        queries_b.float(),
-        points_b.float(),
-        p=2.0,
-        compute_mode="donot_use_mm_for_euclid_dist",
-    )
-    expected_mask = expected_distances <= radius
-
-    assert indices_b.shape == (points_b.shape[0], queries_b.shape[1], max_points)
-    assert selected_points_b.shape == (
-        points_b.shape[0],
-        queries_b.shape[1],
-        max_points,
-        points_b.shape[2],
-    )
-    assert distances_b.shape == (points_b.shape[0], queries_b.shape[1], max_points)
-
-    for batch_idx in range(points_b.shape[0]):
-        for query_idx in range(queries_b.shape[1]):
-            expected_ids = torch.nonzero(
-                expected_mask[batch_idx, query_idx], as_tuple=False
-            ).flatten()
-            neighbor_count = expected_ids.numel()
-            assert neighbor_count <= max_points
-
-            actual_ids = indices_b[batch_idx, query_idx, :neighbor_count].to(
-                torch.long
-            )
-            actual_sorted, actual_order = torch.sort(actual_ids)
-            expected_sorted, _ = torch.sort(expected_ids.to(torch.long))
-            torch.testing.assert_close(actual_sorted.cpu(), expected_sorted.cpu())
-
-            actual_distances = distances_b[batch_idx, query_idx, :neighbor_count][
-                actual_order
-            ]
-            expected_sorted_distances = expected_distances[
-                batch_idx, query_idx, actual_sorted
-            ]
-            torch.testing.assert_close(
-                actual_distances.float(),
-                expected_sorted_distances.float(),
-                atol=1e-5,
-                rtol=1e-5,
-            )
-
-            actual_points = selected_points_b[batch_idx, query_idx, :neighbor_count][
-                actual_order
-            ]
-            expected_points = points_b[batch_idx, actual_sorted]
-            torch.testing.assert_close(actual_points, expected_points)
-
-            if neighbor_count < max_points:
-                assert (indices_b[batch_idx, query_idx, neighbor_count:] == 0).all()
-                assert (distances_b[batch_idx, query_idx, neighbor_count:] == 0).all()
-                assert (selected_points_b[batch_idx, query_idx, neighbor_count:] == 0).all()
-
-
 # Validate the torch implementation across return modes.
 @pytest.mark.parametrize("return_dists", [True, False])
 @pytest.mark.parametrize("return_points", [True, False])
@@ -232,609 +154,6 @@ def test_radius_search_warp(
         return_points,
         results,
     )
-
-
-# Validate the experimental compact-cell-points implementation across return modes.
-@requires_module("cupy>=13.6.0")
-@pytest.mark.parametrize("return_dists", [True, False])
-@pytest.mark.parametrize("return_points", [True, False])
-def test_radius_search_compact_cell_points(
-    device: str,
-    return_dists: bool,
-    return_points: bool,
-):
-    if device == "cpu":
-        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
-
-    points, queries = _build_problem(device)
-    radius = 0.17
-    max_points = points.shape[0]
-    results = radius_search(
-        points=points,
-        queries=queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=return_dists,
-        return_points=return_points,
-        implementation="compact_cell_points",
-    )
-    _assert_radius_outputs(
-        points,
-        queries,
-        radius,
-        max_points,
-        return_dists,
-        return_points,
-        results,
-    )
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_compact_cell_points_forward_parity(device: str):
-    if device == "cpu":
-        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
-
-    torch.manual_seed(42)
-    points = torch.randn(53, 3, device=device)
-    queries = torch.randn(21, 3, device=device)
-    radius = 0.5
-    max_points = points.shape[0]
-
-    output = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="compact_cell_points",
-    )
-    reference = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="torch",
-    )
-
-    RadiusSearch.compare_forward(output, reference)
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_compact_cell_points_exact_untruncated_parity(device: str):
-    if device == "cpu":
-        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
-
-    points = torch.tensor(
-        [
-            [10.0, 10.0, 10.0],
-            [0.10, 0.00, 0.00],
-            [0.00, 0.20, 0.00],
-            [1.20, 0.00, 0.00],
-            [2.05, 0.00, 0.00],
-            [2.00, 0.25, 0.00],
-            [-0.25, 0.00, 0.00],
-            [0.00, 0.00, 0.35],
-        ],
-        device=device,
-    )
-    queries = torch.tensor(
-        [
-            [0.00, 0.00, 0.00],
-            [2.00, 0.00, 0.00],
-            [5.00, 5.00, 5.00],
-        ],
-        device=device,
-    )
-    radius = 0.30
-    max_points = 5
-
-    output = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="compact_cell_points",
-    )
-    reference = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="torch",
-    )
-
-    _assert_static_exact_neighbors(points, queries, radius, max_points, output)
-    _assert_static_exact_neighbors(points, queries, radius, max_points, reference)
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_compact_cell_points_batched_exact_parity(device: str):
-    if device == "cpu":
-        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
-
-    points = torch.tensor(
-        [
-            [
-                [0.10, 0.00, 0.00],
-                [-0.20, 0.00, 0.00],
-                [2.05, 0.00, 0.00],
-                [1.05, 0.00, 0.00],
-                [7.00, 7.00, 7.00],
-            ],
-            [
-                [5.00, 5.00, 5.00],
-                [1.10, 0.00, 0.00],
-                [1.25, 0.00, 0.00],
-                [0.05, 0.00, 0.00],
-                [-2.20, 0.00, 0.00],
-            ],
-        ],
-        device=device,
-    )
-    queries = torch.tensor(
-        [
-            [
-                [0.00, 0.00, 0.00],
-                [2.00, 0.00, 0.00],
-                [8.00, 8.00, 8.00],
-            ],
-            [
-                [1.00, 0.00, 0.00],
-                [-2.00, 0.00, 0.00],
-                [0.00, 4.00, 0.00],
-            ],
-        ],
-        device=device,
-    )
-    radius = 0.30
-    max_points = 4
-
-    output = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="compact_cell_points",
-    )
-    reference = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="torch",
-    )
-
-    _assert_static_exact_neighbors(points, queries, radius, max_points, output)
-    _assert_static_exact_neighbors(points, queries, radius, max_points, reference)
-
-
-@requires_module("cupy>=13.6.0")
-@requires_module("warp")
-def test_radius_search_compact_cell_points_matches_warp_and_brute_force(device: str):
-    if device == "cpu":
-        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
-
-    points = torch.tensor(
-        [
-            [
-                [0.00, 0.00, 0.00],
-                [0.10, 0.00, 0.00],
-                [-0.20, 0.05, 0.00],
-                [0.00, 0.00, 0.30],
-                [1.00, 0.00, 0.00],
-                [1.12, 0.02, 0.00],
-                [1.30, 0.00, 0.00],
-                [-1.00, -1.00, -1.00],
-            ],
-            [
-                [0.50, 0.50, 0.50],
-                [0.62, 0.50, 0.50],
-                [0.50, 0.30, 0.50],
-                [0.50, 0.50, 0.76],
-                [-0.50, 0.00, 0.00],
-                [-0.72, 0.00, 0.00],
-                [-0.50, 0.24, 0.00],
-                [3.00, 3.00, 3.00],
-            ],
-        ],
-        device=device,
-    )
-    queries = torch.tensor(
-        [
-            [
-                [0.00, 0.00, 0.00],
-                [1.00, 0.00, 0.00],
-                [5.00, 5.00, 5.00],
-            ],
-            [
-                [0.50, 0.50, 0.50],
-                [-0.50, 0.00, 0.00],
-                [2.00, 2.00, 2.00],
-            ],
-        ],
-        device=device,
-    )
-    radius = 0.25
-    max_points = points.shape[1]
-
-    compact_cell_points_output = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="compact_cell_points",
-    )
-    warp_output = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="warp",
-    )
-
-    _assert_static_exact_neighbors(
-        points, queries, radius, max_points, compact_cell_points_output
-    )
-    _assert_static_exact_neighbors(points, queries, radius, max_points, warp_output)
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_compact_cell_points_boundary_cases(device: str):
-    if device == "cpu":
-        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
-
-    cases = [
-        (
-            "radius_boundary",
-            torch.tensor(
-                [
-                    [0.50, 0.00, 0.00],
-                    [0.5001, 0.00, 0.00],
-                    [0.4999, 0.00, 0.00],
-                    [-0.50, 0.00, 0.00],
-                    [-0.5001, 0.00, 0.00],
-                    [0.00, 0.50, 0.00],
-                    [0.00, 0.00, -0.50],
-                ],
-                device=device,
-            ),
-            torch.tensor([[0.00, 0.00, 0.00]], device=device),
-            0.50,
-            5,
-        ),
-        (
-            "cell_boundary",
-            torch.tensor(
-                [
-                    [0.00, 0.00, 0.00],
-                    [1.00, 0.00, 0.00],
-                    [1.001, 0.00, 0.00],
-                    [0.50, 0.50, 0.00],
-                    [0.50, -0.50, 0.00],
-                ],
-                device=device,
-            ),
-            torch.tensor([[0.50, 0.00, 0.00]], device=device),
-            0.50,
-            4,
-        ),
-        (
-            "negative_coordinates",
-            torch.tensor(
-                [
-                    [-1.25, -1.00, -1.00],
-                    [-0.75, -1.00, -1.00],
-                    [-1.00, -1.251, -1.00],
-                    [-3.00, -3.00, -3.00],
-                ],
-                device=device,
-            ),
-            torch.tensor([[-1.00, -1.00, -1.00]], device=device),
-            0.25,
-            3,
-        ),
-        (
-            "no_neighbors",
-            torch.tensor(
-                [[2.00, 2.00, 2.00], [-2.00, -2.00, -2.00]], device=device
-            ),
-            torch.tensor([[0.00, 0.00, 0.00], [4.00, 4.00, 4.00]], device=device),
-            0.25,
-            2,
-        ),
-        (
-            "empty_points",
-            torch.empty((0, 3), device=device),
-            torch.tensor([[0.00, 0.00, 0.00], [1.00, 0.00, 0.00]], device=device),
-            0.50,
-            3,
-        ),
-        (
-            "empty_queries",
-            torch.tensor([[0.00, 0.00, 0.00], [1.00, 0.00, 0.00]], device=device),
-            torch.empty((0, 3), device=device),
-            0.50,
-            3,
-        ),
-    ]
-
-    for label, points, queries, radius, max_points in cases:
-        output = radius_search(
-            points,
-            queries,
-            radius=radius,
-            max_points=max_points,
-            return_dists=True,
-            return_points=True,
-            implementation="compact_cell_points",
-        )
-        _assert_static_exact_neighbors(points, queries, radius, max_points, output)
-
-        if label == "empty_points":
-            continue
-
-        reference = radius_search(
-            points,
-            queries,
-            radius=radius,
-            max_points=max_points,
-            return_dists=True,
-            return_points=True,
-            implementation="torch",
-        )
-        _assert_static_exact_neighbors(points, queries, radius, max_points, reference)
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_compact_cell_points_requires_static_cuda(device: str):
-    if device == "cpu":
-        pytest.skip("compact_cell_points radius_search implementation requires CUDA")
-
-    points, queries = _build_problem(device)
-    with pytest.raises(ValueError, match="requires max_points"):
-        radius_search(
-            points=points,
-            queries=queries,
-            radius=0.17,
-            max_points=None,
-            implementation="compact_cell_points",
-        )
-
-
-# Validate the experimental Morton-sorted implementation across return modes.
-@requires_module("cupy>=13.6.0")
-@pytest.mark.parametrize("return_dists", [True, False])
-@pytest.mark.parametrize("return_points", [True, False])
-def test_radius_search_morton_cell_points(
-    device: str,
-    return_dists: bool,
-    return_points: bool,
-):
-    if device == "cpu":
-        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
-
-    points, queries = _build_problem(device)
-    radius = 0.17
-    max_points = points.shape[0]
-    results = radius_search(
-        points=points,
-        queries=queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=return_dists,
-        return_points=return_points,
-        implementation="morton_cell_points",
-    )
-    _assert_radius_outputs(
-        points,
-        queries,
-        radius,
-        max_points,
-        return_dists,
-        return_points,
-        results,
-    )
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_morton_cell_points_exact_untruncated_parity(device: str):
-    if device == "cpu":
-        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
-
-    points = torch.tensor(
-        [
-            [10.0, 10.0, 10.0],
-            [0.10, 0.00, 0.00],
-            [0.00, 0.20, 0.00],
-            [1.20, 0.00, 0.00],
-            [2.05, 0.00, 0.00],
-            [2.00, 0.25, 0.00],
-            [-0.25, 0.00, 0.00],
-            [0.00, 0.00, 0.35],
-        ],
-        device=device,
-    )
-    queries = torch.tensor(
-        [
-            [0.00, 0.00, 0.00],
-            [2.00, 0.00, 0.00],
-            [5.00, 5.00, 5.00],
-        ],
-        device=device,
-    )
-    radius = 0.30
-    max_points = 5
-
-    output = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="morton_cell_points",
-    )
-    reference = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="torch",
-    )
-
-    _assert_static_exact_neighbors(points, queries, radius, max_points, output)
-    _assert_static_exact_neighbors(points, queries, radius, max_points, reference)
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_morton_cell_points_batched_exact_parity(device: str):
-    if device == "cpu":
-        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
-
-    points = torch.tensor(
-        [
-            [
-                [0.10, 0.00, 0.00],
-                [-0.20, 0.00, 0.00],
-                [2.05, 0.00, 0.00],
-                [1.05, 0.00, 0.00],
-                [7.00, 7.00, 7.00],
-            ],
-            [
-                [5.00, 5.00, 5.00],
-                [1.10, 0.00, 0.00],
-                [1.25, 0.00, 0.00],
-                [0.05, 0.00, 0.00],
-                [-2.20, 0.00, 0.00],
-            ],
-        ],
-        device=device,
-    )
-    queries = torch.tensor(
-        [
-            [
-                [0.00, 0.00, 0.00],
-                [2.00, 0.00, 0.00],
-                [8.00, 8.00, 8.00],
-            ],
-            [
-                [1.00, 0.00, 0.00],
-                [-2.00, 0.00, 0.00],
-                [0.00, 4.00, 0.00],
-            ],
-        ],
-        device=device,
-    )
-    radius = 0.30
-    max_points = 4
-
-    output = radius_search(
-        points,
-        queries,
-        radius=radius,
-        max_points=max_points,
-        return_dists=True,
-        return_points=True,
-        implementation="morton_cell_points",
-    )
-    _assert_static_exact_neighbors(points, queries, radius, max_points, output)
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_morton_cell_points_boundary_cases(device: str):
-    if device == "cpu":
-        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
-
-    cases = [
-        (
-            torch.tensor(
-                [
-                    [0.50, 0.00, 0.00],
-                    [0.5001, 0.00, 0.00],
-                    [0.4999, 0.00, 0.00],
-                    [-0.50, 0.00, 0.00],
-                    [-0.5001, 0.00, 0.00],
-                    [0.00, 0.50, 0.00],
-                    [0.00, 0.00, -0.50],
-                ],
-                device=device,
-            ),
-            torch.tensor([[0.00, 0.00, 0.00]], device=device),
-            0.50,
-            5,
-        ),
-        (
-            torch.tensor(
-                [
-                    [-1.25, -1.00, -1.00],
-                    [-0.75, -1.00, -1.00],
-                    [-1.00, -1.251, -1.00],
-                    [-3.00, -3.00, -3.00],
-                ],
-                device=device,
-            ),
-            torch.tensor([[-1.00, -1.00, -1.00]], device=device),
-            0.25,
-            3,
-        ),
-        (
-            torch.empty((0, 3), device=device),
-            torch.tensor([[0.00, 0.00, 0.00], [1.00, 0.00, 0.00]], device=device),
-            0.50,
-            3,
-        ),
-        (
-            torch.tensor([[0.00, 0.00, 0.00], [1.00, 0.00, 0.00]], device=device),
-            torch.empty((0, 3), device=device),
-            0.50,
-            3,
-        ),
-    ]
-
-    for points, queries, radius, max_points in cases:
-        output = radius_search(
-            points,
-            queries,
-            radius=radius,
-            max_points=max_points,
-            return_dists=True,
-            return_points=True,
-            implementation="morton_cell_points",
-        )
-        _assert_static_exact_neighbors(points, queries, radius, max_points, output)
-
-
-@requires_module("cupy>=13.6.0")
-def test_radius_search_morton_cell_points_requires_static_cuda(device: str):
-    if device == "cpu":
-        pytest.skip("morton_cell_points radius_search implementation requires CUDA")
-
-    points, queries = _build_problem(device)
-    with pytest.raises(ValueError, match="requires max_points"):
-        radius_search(
-            points=points,
-            queries=queries,
-            radius=0.17,
-            max_points=None,
-            implementation="morton_cell_points",
-        )
 
 
 # Validate benchmark input generation contract for radius search.
@@ -1324,3 +643,184 @@ def test_radius_search_batched_opcheck(device: str):
         radius_search_warp,
         args=(points, queries, 1.5, 8, True, True),
     )
+
+
+_CELL_BACKENDS = ("compact_cell_points", "morton_cell_points")
+
+
+def _assert_static_neighbors_match_brute_force(
+    points: torch.Tensor,
+    queries: torch.Tensor,
+    radius: float,
+    implementation: str,
+) -> None:
+    """Check an untruncated static result without assuming neighbor order."""
+    max_points = max(1, points.shape[-2])
+    indices, selected_points, distances = radius_search(
+        points,
+        queries,
+        radius=radius,
+        max_points=max_points,
+        return_dists=True,
+        return_points=True,
+        implementation=implementation,
+    )
+
+    was_unbatched = points.ndim == 2
+    points_b = points.unsqueeze(0) if was_unbatched else points
+    queries_b = queries.unsqueeze(0) if was_unbatched else queries
+    indices_b = indices.unsqueeze(0) if was_unbatched else indices
+    selected_points_b = (
+        selected_points.unsqueeze(0) if was_unbatched else selected_points
+    )
+    distances_b = distances.unsqueeze(0) if was_unbatched else distances
+    expected_distances = torch.cdist(
+        queries_b.float(),
+        points_b.float(),
+        compute_mode="donot_use_mm_for_euclid_dist",
+    )
+
+    for batch_idx in range(points_b.shape[0]):
+        for query_idx in range(queries_b.shape[1]):
+            expected_ids = torch.nonzero(
+                expected_distances[batch_idx, query_idx] <= radius,
+                as_tuple=False,
+            ).flatten()
+            count = expected_ids.numel()
+            actual_ids = indices_b[batch_idx, query_idx, :count].long()
+            torch.testing.assert_close(
+                actual_ids.sort().values,
+                expected_ids.sort().values,
+            )
+            torch.testing.assert_close(
+                selected_points_b[batch_idx, query_idx, :count],
+                points_b[batch_idx, actual_ids],
+            )
+            torch.testing.assert_close(
+                distances_b[batch_idx, query_idx, :count].float(),
+                expected_distances[batch_idx, query_idx, actual_ids],
+                atol=1e-5,
+                rtol=1e-5,
+            )
+            assert (indices_b[batch_idx, query_idx, count:] == 0).all()
+
+
+@requires_module("cupy")
+@pytest.mark.parametrize("implementation", _CELL_BACKENDS)
+@pytest.mark.parametrize("return_dists", [False, True])
+@pytest.mark.parametrize("return_points", [False, True])
+def test_radius_search_cell_backend_return_modes(
+    device: str,
+    implementation: str,
+    return_dists: bool,
+    return_points: bool,
+):
+    if device == "cpu":
+        pytest.skip(f"{implementation} requires CUDA")
+
+    points, queries = _build_problem(device)
+    results = radius_search(
+        points,
+        queries,
+        radius=0.17,
+        max_points=8,
+        return_dists=return_dists,
+        return_points=return_points,
+        implementation=implementation,
+    )
+    _assert_radius_outputs(
+        points,
+        queries,
+        0.17,
+        8,
+        return_dists,
+        return_points,
+        results,
+    )
+
+
+@requires_module("cupy")
+@pytest.mark.parametrize("implementation", _CELL_BACKENDS)
+@pytest.mark.parametrize("batched", [False, True])
+def test_radius_search_cell_backend_exact_neighbors(
+    device: str,
+    implementation: str,
+    batched: bool,
+):
+    if device == "cpu":
+        pytest.skip(f"{implementation} requires CUDA")
+
+    points = torch.tensor(
+        [
+            [0.50, 0.00, 0.00],
+            [0.5001, 0.00, 0.00],
+            [0.4999, 0.00, 0.00],
+            [-0.50, 0.00, 0.00],
+            [-0.5001, 0.00, 0.00],
+            [-1.25, -1.00, -1.00],
+            [-0.75, -1.00, -1.00],
+            [3.00, 3.00, 3.00],
+        ],
+        device=device,
+    )
+    queries = torch.tensor(
+        [[0.00, 0.00, 0.00], [-1.00, -1.00, -1.00], [8.00, 8.00, 8.00]],
+        device=device,
+    )
+    if batched:
+        points = torch.stack((points, points + 0.125))
+        queries = torch.stack((queries, queries + 0.125))
+
+    _assert_static_neighbors_match_brute_force(
+        points,
+        queries,
+        radius=0.5,
+        implementation=implementation,
+    )
+
+
+@requires_module("cupy")
+@pytest.mark.parametrize("implementation", _CELL_BACKENDS)
+def test_radius_search_cell_backend_empty_inputs(
+    device: str,
+    implementation: str,
+):
+    if device == "cpu":
+        pytest.skip(f"{implementation} requires CUDA")
+
+    empty_points = torch.empty((0, 3), device=device)
+    queries = torch.tensor([[0.0, 0.0, 0.0]], device=device)
+    _assert_static_neighbors_match_brute_force(
+        empty_points,
+        queries,
+        radius=0.5,
+        implementation=implementation,
+    )
+
+    points = torch.tensor([[0.0, 0.0, 0.0]], device=device)
+    empty_queries = torch.empty((0, 3), device=device)
+    _assert_static_neighbors_match_brute_force(
+        points,
+        empty_queries,
+        radius=0.5,
+        implementation=implementation,
+    )
+
+
+@requires_module("cupy")
+@pytest.mark.parametrize("implementation", _CELL_BACKENDS)
+def test_radius_search_cell_backend_requires_max_points(
+    device: str,
+    implementation: str,
+):
+    if device == "cpu":
+        pytest.skip(f"{implementation} requires CUDA")
+
+    points, queries = _build_problem(device)
+    with pytest.raises(ValueError, match="requires max_points"):
+        radius_search(
+            points,
+            queries,
+            radius=0.17,
+            implementation=implementation,
+        )

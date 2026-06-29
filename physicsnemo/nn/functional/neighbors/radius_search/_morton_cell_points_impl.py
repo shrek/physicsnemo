@@ -35,16 +35,9 @@ import importlib
 from functools import lru_cache
 
 import torch
-from torch.profiler import record_function
-
 from physicsnemo.core.version_check import check_version_spec
 
-from .utils import (
-    format_returns,
-    maybe_capture_radius_search,
-    time_radius_search,
-    validate_inputs,
-)
+from .utils import format_returns, validate_inputs
 
 CUPY_AVAILABLE = check_version_spec("cupy", "13.6.0", hard_fail=False)
 
@@ -365,9 +358,7 @@ def _build_cell_directory(
     sort_order = torch.argsort(point_keys)
     sorted_keys = point_keys[sort_order].contiguous()
     sorted_point_ids = point_ids[sort_order].contiguous()
-    unique_keys, cell_counts = torch.unique_consecutive(
-        sorted_keys, return_counts=True
-    )
+    unique_keys, cell_counts = torch.unique_consecutive(sorted_keys, return_counts=True)
     cell_counts = cell_counts.to(torch.int32)
     cell_offsets = torch.empty_like(cell_counts)
     cell_offsets[0] = 0
@@ -396,9 +387,13 @@ def radius_search_impl(
     if points.device != queries.device:
         raise ValueError("points and queries must be on the same device")
     if points.device.type != "cuda":
-        raise ValueError("morton_cell_points radius_search implementation requires CUDA input")
+        raise ValueError(
+            "morton_cell_points radius_search implementation requires CUDA input"
+        )
     if max_points is None:
-        raise ValueError("morton_cell_points radius_search implementation requires max_points")
+        raise ValueError(
+            "morton_cell_points radius_search implementation requires max_points"
+        )
     if max_points <= 0:
         raise ValueError(f"max_points must be positive, got {max_points}")
     if radius <= 0:
@@ -408,10 +403,16 @@ def radius_search_impl(
     input_queries = queries
     points, queries, was_unbatched = validate_inputs(points, queries)
     if points.shape[-1] != 3 or queries.shape[-1] != 3:
-        raise ValueError("morton_cell_points radius_search implementation requires 3D points")
+        raise ValueError(
+            "morton_cell_points radius_search implementation requires 3D points"
+        )
 
-    points_kernel = points.to(torch.float32) if points.dtype != torch.float32 else points
-    queries_kernel = queries.to(torch.float32) if queries.dtype != torch.float32 else queries
+    points_kernel = (
+        points.to(torch.float32) if points.dtype != torch.float32 else points
+    )
+    queries_kernel = (
+        queries.to(torch.float32) if queries.dtype != torch.float32 else queries
+    )
     points_kernel = points_kernel.contiguous()
     queries_kernel = queries_kernel.contiguous()
 
@@ -494,8 +495,8 @@ def radius_search_impl(
                 ),
             )
 
-        unique_keys, cell_offsets, cell_counts, sorted_point_ids = _build_cell_directory(
-            point_keys, point_ids
+        unique_keys, cell_offsets, cell_counts, sorted_point_ids = (
+            _build_cell_directory(point_keys, point_ids)
         )
 
         with cp.cuda.Device(device_index), cupy_stream:
@@ -545,7 +546,6 @@ def radius_search_impl(
             0, max_points, 3, device=points.device, dtype=points.dtype
         )
 
-    capture_counts = counts.squeeze(0) if was_unbatched else counts
     if was_unbatched:
         indices = indices.squeeze(0)
         if return_points and points_out.ndim == 4:
@@ -553,16 +553,6 @@ def radius_search_impl(
         if return_dists:
             distances = distances.squeeze(0)
 
-    maybe_capture_radius_search(
-        "morton_cell_points",
-        input_points,
-        input_queries,
-        radius,
-        max_points,
-        return_dists,
-        return_points,
-        num_neighbors=capture_counts,
-    )
     return indices, points_out, distances
 
 
@@ -576,16 +566,12 @@ def radius_search(
     return_points: bool = False,
 ):
     """morton_cell_points backend entry point for radius search with formatted returns."""
-    with (
-        record_function("physicsnemo::radius_search_morton_cell_points"),
-        time_radius_search("morton_cell_points"),
-    ):
-        indices, points_out, distances = radius_search_impl(
-            points,
-            queries,
-            radius,
-            max_points,
-            return_dists,
-            return_points,
-        )
-        return format_returns(indices, points_out, distances, return_dists, return_points)
+    indices, points_out, distances = radius_search_impl(
+        points,
+        queries,
+        radius,
+        max_points,
+        return_dists,
+        return_points,
+    )
+    return format_returns(indices, points_out, distances, return_dists, return_points)
