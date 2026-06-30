@@ -35,6 +35,7 @@ import importlib
 from functools import lru_cache
 
 import torch
+
 from physicsnemo.core.version_check import check_version_spec
 
 from .utils import format_returns, validate_inputs
@@ -318,7 +319,8 @@ def _require_cupy() -> None:
 
 def _as_cupy(tensor: torch.Tensor):
     """Create a zero-copy CuPy view of a CUDA torch tensor."""
-    assert cp is not None
+    if cp is None:
+        raise RuntimeError("CuPy >= 13.6.0 is required for this backend")
     return cp.from_dlpack(tensor.detach().contiguous())
 
 
