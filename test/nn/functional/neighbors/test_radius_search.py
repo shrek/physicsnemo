@@ -780,6 +780,34 @@ def test_radius_search_cell_backend_exact_neighbors(
 
 
 @requires_module("cupy")
+@pytest.mark.parametrize("batched", [False, True])
+def test_radius_search_compact_cell_same_tensor_queries(device: str, batched: bool):
+    """Exercise compact cell ordering when points and queries alias."""
+    if device == "cpu":
+        pytest.skip("compact_cell_points requires CUDA")
+
+    points = torch.tensor(
+        [
+            [-0.75, -0.50, 0.00],
+            [-0.25, -0.25, 0.00],
+            [0.00, 0.00, 0.00],
+            [0.20, 0.10, 0.00],
+            [0.70, 0.50, 0.00],
+        ],
+        device=device,
+    )
+    if batched:
+        points = torch.stack((points, points + 0.125))
+
+    _assert_static_neighbors_match_brute_force(
+        points,
+        points,
+        radius=0.6,
+        implementation="compact_cell_points",
+    )
+
+
+@requires_module("cupy")
 @pytest.mark.parametrize("implementation", _CELL_BACKENDS)
 def test_radius_search_cell_backend_empty_inputs(
     device: str,

@@ -243,6 +243,7 @@ void radius_search_v2(
     const int num_points,
     const int max_points,
     const int table_capacity,
+    const int use_compact_query_order,
     const float radius,
     const float radius_sq,
     const int write_points,
@@ -254,10 +255,13 @@ void radius_search_v2(
 
     const int lane = threadIdx.x & (warp_size - 1);
     const int warp_id = threadIdx.x / warp_size;
-    const int query_id = blockIdx.x * warps_per_block + warp_id;
-    if (query_id >= total_queries) {
+    const int linear_query_id = blockIdx.x * warps_per_block + warp_id;
+    if (linear_query_id >= total_queries) {
         return;
     }
+    const int query_id = use_compact_query_order
+        ? compact_point_ids[linear_query_id]
+        : linear_query_id;
 
     const float qx = queries[query_id * 3 + 0];
     const float qy = queries[query_id * 3 + 1];
@@ -460,6 +464,11 @@ def radius_search_impl(
 
     input_points = points
     input_queries = queries
+    use_compact_query_order = (
+        input_points.shape == input_queries.shape
+        and input_points.stride() == input_queries.stride()
+        and input_points.data_ptr() == input_queries.data_ptr()
+    )
     points, queries, was_unbatched = validate_inputs(points, queries)
     if points.shape[-1] != 3 or queries.shape[-1] != 3:
         raise ValueError(
@@ -614,6 +623,7 @@ def radius_search_impl(
                     cp.int32(num_points),
                     cp.int32(max_points),
                     cp.int32(table_capacity),
+                    cp.int32(use_compact_query_order),
                     cp.float32(radius),
                     cp.float32(radius * radius),
                     cp.int32(write_points_in_kernel),
