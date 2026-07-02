@@ -274,75 +274,80 @@ void radius_search_v2(
     int found = 0;
     const int out_base = query_id * max_points;
 
-    for (int dx_cell = -1; dx_cell <= 1 && found < max_points; ++dx_cell) {
-        for (int dy_cell = -1; dy_cell <= 1 && found < max_points; ++dy_cell) {
-            for (int dz_cell = -1; dz_cell <= 1 && found < max_points; ++dz_cell) {
-                int table_slot = -1;
-                if (lane == 0) {
-                    table_slot = table_lookup(
-                        qcx + dx_cell,
-                        qcy + dy_cell,
-                        qcz + dz_cell,
-                        query_batch,
-                        table_states,
-                        table_cell_coords,
-                        table_batches,
-                        table_capacity);
+    // Resolve all 27 neighboring cells concurrently. Processing below remains
+    // in the original dx/dy/dz order so first-found truncation is unchanged.
+    int lane_table_slot = -1;
+    if (lane < 27) {
+        const int dx_cell = lane / 9 - 1;
+        const int dy_cell = (lane / 3) % 3 - 1;
+        const int dz_cell = lane % 3 - 1;
+        lane_table_slot = table_lookup(
+            qcx + dx_cell,
+            qcy + dy_cell,
+            qcz + dz_cell,
+            query_batch,
+            table_states,
+            table_cell_coords,
+            table_batches,
+            table_capacity);
+    }
+
+    for (int cell_index = 0;
+         cell_index < 27 && found < max_points;
+         ++cell_index) {
+        const int table_slot = __shfl_sync(
+            full_mask, lane_table_slot, cell_index);
+        if (table_slot < 0) {
+            continue;
+        }
+
+        const int cell_start = cell_offsets[table_slot];
+        const int cell_count = cell_counts[table_slot];
+        const int cell_end = cell_start + cell_count;
+        for (int candidate_base = cell_start;
+             candidate_base < cell_end && found < max_points;
+             candidate_base += warp_size) {
+            const int candidate_offset = candidate_base + lane;
+            int point_id = -1;
+            float dist_sq = 0.0f;
+            bool hit = false;
+            if (candidate_offset < cell_end) {
+                point_id = compact_point_ids[candidate_offset];
+                const float px = points[point_id * 3 + 0];
+                const float py = points[point_id * 3 + 1];
+                const float pz = points[point_id * 3 + 2];
+                const float xdiff = px - qx;
+                const float ydiff = py - qy;
+                const float zdiff = pz - qz;
+                dist_sq = xdiff * xdiff + ydiff * ydiff + zdiff * zdiff;
+                hit = dist_sq <= radius_sq;
+            }
+
+            const unsigned int hit_mask = __ballot_sync(full_mask, hit);
+            const int num_hits = __popc(hit_mask);
+            if (num_hits == 0) {
+                continue;
+            }
+
+            const int space = max_points - found;
+            const int write_hits = num_hits < space ? num_hits : space;
+            const unsigned int lower_lane_mask = (1U << lane) - 1U;
+            const int hit_rank = __popc(hit_mask & lower_lane_mask);
+            if (hit && hit_rank < write_hits) {
+                const int out_offset = out_base + found + hit_rank;
+                const int local_point = point_id % num_points;
+                indices[out_offset] = local_point;
+                if (write_points) {
+                    output_points[out_offset * 3 + 0] = points[point_id * 3 + 0];
+                    output_points[out_offset * 3 + 1] = points[point_id * 3 + 1];
+                    output_points[out_offset * 3 + 2] = points[point_id * 3 + 2];
                 }
-                table_slot = __shfl_sync(full_mask, table_slot, 0);
-                if (table_slot < 0) {
-                    continue;
-                }
-
-                const int cell_start = cell_offsets[table_slot];
-                const int cell_count = cell_counts[table_slot];
-                const int cell_end = cell_start + cell_count;
-                for (int candidate_base = cell_start;
-                     candidate_base < cell_end && found < max_points;
-                     candidate_base += warp_size) {
-                    const int candidate_offset = candidate_base + lane;
-                    int point_id = -1;
-                    float dist_sq = 0.0f;
-                    bool hit = false;
-                    if (candidate_offset < cell_end) {
-                        point_id = compact_point_ids[candidate_offset];
-                        const float px = points[point_id * 3 + 0];
-                        const float py = points[point_id * 3 + 1];
-                        const float pz = points[point_id * 3 + 2];
-                        const float xdiff = px - qx;
-                        const float ydiff = py - qy;
-                        const float zdiff = pz - qz;
-                        dist_sq = xdiff * xdiff + ydiff * ydiff + zdiff * zdiff;
-                        hit = dist_sq <= radius_sq;
-                    }
-
-                    const unsigned int hit_mask = __ballot_sync(full_mask, hit);
-                    const int num_hits = __popc(hit_mask);
-                    if (num_hits == 0) {
-                        continue;
-                    }
-
-                    const int space = max_points - found;
-                    const int write_hits = num_hits < space ? num_hits : space;
-                    const unsigned int lower_lane_mask = (1U << lane) - 1U;
-                    const int hit_rank = __popc(hit_mask & lower_lane_mask);
-                    if (hit && hit_rank < write_hits) {
-                        const int out_offset = out_base + found + hit_rank;
-                        const int local_point = point_id % num_points;
-                        indices[out_offset] = local_point;
-                        if (write_points) {
-                            output_points[out_offset * 3 + 0] = points[point_id * 3 + 0];
-                            output_points[out_offset * 3 + 1] = points[point_id * 3 + 1];
-                            output_points[out_offset * 3 + 2] = points[point_id * 3 + 2];
-                        }
-                        if (write_dists) {
-                            distances[out_offset] = sqrtf(dist_sq);
-                        }
-                    }
-
-                    found += write_hits;
+                if (write_dists) {
+                    distances[out_offset] = sqrtf(dist_sq);
                 }
             }
+
+            found += write_hits;
         }
     }
 
