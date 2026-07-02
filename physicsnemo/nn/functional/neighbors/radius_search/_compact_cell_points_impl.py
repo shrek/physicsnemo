@@ -49,6 +49,13 @@ else:
 _RADIUS_SEARCH_V2_KERNEL = r"""
 namespace {
 
+struct __align__(16) CompactPoint {
+    float x;
+    float y;
+    float z;
+    int point_id;
+};
+
 __device__ __forceinline__ unsigned long long cell_hash(
     const long long cx,
     const long long cy,
@@ -204,10 +211,11 @@ void count_point_cells_v2(
 
 extern "C" __global__
 void scatter_point_bins_v2(
+    const float* __restrict__ points,
     const int* __restrict__ point_cell_slots,
     const int* __restrict__ cell_offsets,
     int* __restrict__ cell_write_offsets,
-    int* __restrict__ compact_point_ids,
+    CompactPoint* __restrict__ compact_points,
     const int total_points
 ) {
     const int point_id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -221,19 +229,25 @@ void scatter_point_bins_v2(
     }
 
     const int local_offset = atomicAdd(&cell_write_offsets[slot], 1);
-    compact_point_ids[cell_offsets[slot] + local_offset] = point_id;
+    const int compact_offset = cell_offsets[slot] + local_offset;
+    CompactPoint compact_point;
+    compact_point.x = points[point_id * 3 + 0];
+    compact_point.y = points[point_id * 3 + 1];
+    compact_point.z = points[point_id * 3 + 2];
+    compact_point.point_id = point_id;
+    compact_points[compact_offset] = compact_point;
 }
 
 extern "C" __global__
 void radius_search_v2(
     const float* __restrict__ points,
+    const CompactPoint* __restrict__ compact_points,
     const float* __restrict__ queries,
     const int* __restrict__ table_states,
     const long long* __restrict__ table_cell_coords,
     const long long* __restrict__ table_batches,
     const int* __restrict__ cell_offsets,
     const int* __restrict__ cell_counts,
-    const int* __restrict__ compact_point_ids,
     int* __restrict__ indices,
     float* __restrict__ output_points,
     float* __restrict__ distances,
@@ -260,7 +274,7 @@ void radius_search_v2(
         return;
     }
     const int query_id = use_compact_query_order
-        ? compact_point_ids[linear_query_id]
+        ? compact_points[linear_query_id].point_id
         : linear_query_id;
 
     const float qx = queries[query_id * 3 + 0];
@@ -316,10 +330,11 @@ void radius_search_v2(
             float dist_sq = 0.0f;
             bool hit = false;
             if (candidate_offset < cell_end) {
-                point_id = compact_point_ids[candidate_offset];
-                const float px = points[point_id * 3 + 0];
-                const float py = points[point_id * 3 + 1];
-                const float pz = points[point_id * 3 + 2];
+                const CompactPoint compact_point = compact_points[candidate_offset];
+                point_id = compact_point.point_id;
+                const float px = compact_point.x;
+                const float py = compact_point.y;
+                const float pz = compact_point.z;
                 const float xdiff = px - qx;
                 const float ydiff = py - qy;
                 const float zdiff = pz - qz;
@@ -549,15 +564,17 @@ def radius_search_impl(
             total_points, dtype=torch.int32, device=points.device
         )
         cell_write_offsets = torch.zeros_like(cell_counts)
-        compact_point_ids = torch.empty(
-            total_points, dtype=torch.int32, device=points.device
+        compact_points = torch.empty(
+            total_points, 4, dtype=torch.float32, device=points.device
         )
 
         device_index = points.device.index
         if device_index is None:
             device_index = torch.cuda.current_device()
 
-        count_kernel, scatter_kernel, search_kernel = _get_radius_search_v2_kernels()
+        count_kernel, scatter_kernel, search_kernel = (
+            _get_radius_search_v2_kernels()
+        )
         current_stream = torch.cuda.current_stream(device_index).cuda_stream
         cupy_stream = cp.cuda.ExternalStream(current_stream)
 
@@ -592,10 +609,11 @@ def radius_search_impl(
                 (point_blocks,),
                 (threads,),
                 (
+                    _as_cupy(flat_points),
                     _as_cupy(point_cell_slots),
                     _as_cupy(cell_offsets),
                     _as_cupy(cell_write_offsets),
-                    _as_cupy(compact_point_ids),
+                    _as_cupy(compact_points),
                     cp.int32(total_points),
                 ),
             )
@@ -607,13 +625,13 @@ def radius_search_impl(
                 (threads,),
                 (
                     _as_cupy(flat_points),
+                    _as_cupy(compact_points),
                     _as_cupy(flat_queries),
                     _as_cupy(table_states),
                     _as_cupy(table_cell_coords),
                     _as_cupy(table_batches),
                     _as_cupy(cell_offsets),
                     _as_cupy(cell_counts),
-                    _as_cupy(compact_point_ids),
                     _as_cupy(indices.reshape(total_queries, max_points)),
                     _as_cupy(points_out.reshape(-1, 3)),
                     _as_cupy(distance_workspace.reshape(total_queries, max_points)),
