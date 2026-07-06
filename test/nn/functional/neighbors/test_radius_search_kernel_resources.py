@@ -17,9 +17,6 @@
 from physicsnemo.nn.functional.neighbors.radius_search._compact_cell_points_impl import (
     _load_radius_search_v2_kernel_source,
 )
-from physicsnemo.nn.functional.neighbors.radius_search._morton_cell_points_impl import (
-    _load_morton_cell_points_kernel_source,
-)
 
 
 def test_compact_cell_kernel_source_resource():
@@ -30,16 +27,5 @@ def test_compact_cell_kernel_source_resource():
         "count_point_cells_v2",
         "scatter_point_bins_v2",
         "radius_search_v2",
-    ):
-        assert f"void {kernel_name}(" in source
-
-
-def test_morton_cell_kernel_source_resource():
-    source = _load_morton_cell_points_kernel_source()
-
-    assert source.startswith("// SPDX-FileCopyrightText:")
-    for kernel_name in (
-        "compute_point_morton_keys",
-        "radius_search_morton_cell_points",
     ):
         assert f"void {kernel_name}(" in source

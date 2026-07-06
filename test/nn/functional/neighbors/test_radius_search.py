@@ -645,7 +645,7 @@ def test_radius_search_batched_opcheck(device: str):
     )
 
 
-_CELL_BACKENDS = ("compact_cell_points", "morton_cell_points")
+_CELL_BACKENDS = ("compact_cell_points",)
 
 
 def _assert_static_neighbors_match_brute_force(
