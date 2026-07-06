@@ -646,6 +646,16 @@ def test_radius_search_batched_opcheck(device: str):
 
 
 _CELL_BACKENDS = ("compact_cell_points",)
+_EXACT_BACKENDS = ("torch", "warp", "compact_cell_points")
+
+
+def _skip_unavailable_backend(implementation: str, device: str) -> None:
+    if implementation == "warp":
+        pytest.importorskip("warp")
+    elif implementation == "compact_cell_points":
+        pytest.importorskip("cupy")
+        if device == "cpu":
+            pytest.skip("compact_cell_points requires CUDA")
 
 
 def _assert_static_neighbors_match_brute_force(
@@ -739,16 +749,14 @@ def test_radius_search_cell_backend_return_modes(
     )
 
 
-@requires_module("cupy")
-@pytest.mark.parametrize("implementation", _CELL_BACKENDS)
+@pytest.mark.parametrize("implementation", _EXACT_BACKENDS)
 @pytest.mark.parametrize("batched", [False, True])
-def test_radius_search_cell_backend_exact_neighbors(
+def test_radius_search_backend_exact_neighbors(
     device: str,
     implementation: str,
     batched: bool,
 ):
-    if device == "cpu":
-        pytest.skip(f"{implementation} requires CUDA")
+    _skip_unavailable_backend(implementation, device)
 
     points = torch.tensor(
         [
@@ -777,6 +785,48 @@ def test_radius_search_cell_backend_exact_neighbors(
         radius=0.5,
         implementation=implementation,
     )
+
+
+@requires_module("cupy")
+@pytest.mark.parametrize("batched", [False, True])
+def test_radius_search_compact_cell_backward_parity(device: str, batched: bool):
+    if device == "cpu":
+        pytest.skip("compact_cell_points requires CUDA")
+
+    torch.manual_seed(42)
+    points = torch.randn(32, 3, device=device)
+    queries = torch.randn(12, 3, device=device)
+    if batched:
+        points = torch.stack((points, points + 0.125))
+        queries = torch.stack((queries, queries + 0.125))
+
+    grads = {}
+    for implementation in ("torch", "compact_cell_points"):
+        pts = points.clone().detach().requires_grad_(True)
+        qrs = queries.clone().detach().requires_grad_(True)
+        _, selected_points = radius_search(
+            pts,
+            qrs,
+            radius=0.5,
+            max_points=points.shape[-2],
+            return_points=True,
+            implementation=implementation,
+        )
+        selected_points.square().sum().backward()
+        grads[implementation] = (
+            pts.grad.detach().clone() if pts.grad is not None else None,
+            qrs.grad.detach().clone() if qrs.grad is not None else None,
+        )
+
+    points_grad_torch, queries_grad_torch = grads["torch"]
+    points_grad_compact, queries_grad_compact = grads["compact_cell_points"]
+    assert points_grad_torch is not None
+    assert points_grad_compact is not None
+    torch.testing.assert_close(points_grad_compact, points_grad_torch)
+
+    # Neighbor selection is non-differentiable with respect to query positions.
+    assert queries_grad_torch is None or torch.all(queries_grad_torch == 0)
+    assert queries_grad_compact is None or torch.all(queries_grad_compact == 0)
 
 
 @requires_module("cupy")
