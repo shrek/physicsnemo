@@ -48,7 +48,7 @@ else:
 
 
 @lru_cache(maxsize=1)
-def _load_radius_search_v2_kernel_source() -> str:
+def _load_compact_cell_points_kernel_source() -> str:
     """Load the package-shipped CUDA source for the compact-cell backend."""
     return (
         files(__package__)
@@ -59,25 +59,25 @@ def _load_radius_search_v2_kernel_source() -> str:
 
 
 @lru_cache(maxsize=1)
-def _get_radius_search_v2_kernels():
+def _get_compact_cell_points_kernels():
     if cp is None:
         raise ImportError(
             "physicsnemo radius_search compact_cell_points implementation requires "
             "cupy>=13.6.0"
         )
     module = cp.RawModule(
-        code=_load_radius_search_v2_kernel_source(),
+        code=_load_compact_cell_points_kernel_source(),
         options=("--std=c++17",),
         name_expressions=(
-            "count_point_cells_v2",
-            "scatter_point_bins_v2",
-            "radius_search_v2",
+            "count_point_cells",
+            "scatter_point_bins",
+            "radius_search",
         ),
     )
     return (
-        module.get_function("count_point_cells_v2"),
-        module.get_function("scatter_point_bins_v2"),
-        module.get_function("radius_search_v2"),
+        module.get_function("count_point_cells"),
+        module.get_function("scatter_point_bins"),
+        module.get_function("radius_search"),
     )
 
 
@@ -253,7 +253,7 @@ def radius_search_impl(
         if device_index is None:
             device_index = torch.cuda.current_device()
 
-        count_kernel, scatter_kernel, search_kernel = _get_radius_search_v2_kernels()
+        count_kernel, scatter_kernel, search_kernel = _get_compact_cell_points_kernels()
         current_stream = torch.cuda.current_stream(device_index).cuda_stream
         cupy_stream = cp.cuda.ExternalStream(current_stream)
 

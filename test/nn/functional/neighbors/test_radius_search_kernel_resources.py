@@ -15,17 +15,17 @@
 # limitations under the License.
 
 from physicsnemo.nn.functional.neighbors.radius_search._compact_cell_points_impl import (
-    _load_radius_search_v2_kernel_source,
+    _load_compact_cell_points_kernel_source,
 )
 
 
 def test_compact_cell_kernel_source_resource():
-    source = _load_radius_search_v2_kernel_source()
+    source = _load_compact_cell_points_kernel_source()
 
     assert source.startswith("// SPDX-FileCopyrightText:")
     for kernel_name in (
-        "count_point_cells_v2",
-        "scatter_point_bins_v2",
-        "radius_search_v2",
+        "count_point_cells",
+        "scatter_point_bins",
+        "radius_search",
     ):
         assert f"void {kernel_name}(" in source

@@ -135,7 +135,7 @@ __device__ __forceinline__ int table_lookup_or_insert(
 }  // namespace
 
 extern "C" __global__
-void count_point_cells_v2(
+void count_point_cells(
     const float* __restrict__ points,
     int* __restrict__ table_states,
     long long* __restrict__ table_cell_coords,
@@ -177,7 +177,7 @@ void count_point_cells_v2(
 }
 
 extern "C" __global__
-void scatter_point_bins_v2(
+void scatter_point_bins(
     const float* __restrict__ points,
     const int* __restrict__ point_cell_slots,
     const int* __restrict__ cell_offsets,
@@ -206,7 +206,7 @@ void scatter_point_bins_v2(
 }
 
 extern "C" __global__
-void radius_search_v2(
+void radius_search(
     const float* __restrict__ points,
     const CompactPoint* __restrict__ compact_points,
     const float* __restrict__ queries,
