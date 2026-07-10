@@ -161,48 +161,37 @@ def _compute_slices_from_projections(
         - ``slice_token``: Shape :math:`(B, H, S, D)`, aggregated features
           per slice.
     """
-    # Compute temperature-scaled softmax over slices
-    if plus and proj_temperature is not None:
-        # Transolver++ uses learned per-token temperature
-        temp = temperature + proj_temperature(fx)
-        clamped_temp = torch.clamp(temp, min=0.01).to(slice_projections.dtype)
-        slice_weights = gumbel_softmax(slice_projections, clamped_temp)  # (B, N, H, S)
-    else:
-        # Standard Transolver uses global temperature
-        clamped_temp = torch.clamp(temperature, min=0.5, max=5).to(
-            slice_projections.dtype
+    with record_function("_compute_slices_from_projections"):
+        # Compute temperature-scaled softmax over slices.
+        if plus and proj_temperature is not None:
+            # Transolver++ uses learned per-token temperature.
+            temp = temperature + proj_temperature(fx)
+            clamped_temp = torch.clamp(temp, min=0.01).to(slice_projections.dtype)
+            slice_weights = gumbel_softmax(slice_projections, clamped_temp)
+        else:
+            # Standard Transolver uses global temperature. Requesting the output
+            # dtype avoids a separate post-softmax cast in eager and compiled modes.
+            clamped_temp = torch.clamp(temperature, min=0.5, max=5).to(
+                slice_projections.dtype
+            )
+            slice_weights = nn.functional.softmax(
+                slice_projections / clamped_temp,
+                dim=-1,
+                dtype=slice_projections.dtype,
+            )
+
+        # Cast to the computation type since temperature parameters are fp32.
+        slice_weights = slice_weights.to(slice_projections.dtype)
+        slice_norm = slice_weights.sum(1) + 1e-2  # (B, H, S)
+
+        # Aggregate first, then normalize the much smaller (B, H, S, D) result.
+        slice_token = torch.matmul(
+            slice_weights.permute(0, 2, 3, 1), fx.permute(0, 2, 1, 3)
         )
-        slice_weights = nn.functional.softmax(
-            slice_projections / clamped_temp, dim=-1
-        )  # (B, N, H, S)
+        slice_token = slice_token / slice_norm.unsqueeze(-1)
 
-    # Cast to the computation type (since the parameter is probably fp32)
-    slice_weights = slice_weights.to(slice_projections.dtype)
-
-    # Computing the slice tokens is a matmul followed by a normalization.
-    # It can, unfortunately, overflow in reduced precision, so normalize first:
-    slice_norm = slice_weights.sum(1) + 1e-2  # (B, H, S)
-    # Sharded note: slice_norm will be a partial sum at this point.
-    # That's because the we're summing over the tokens, which are distributed
-    normed_weights = slice_weights / (slice_norm[:, None, :, :])
-    # Normed weights has shape (B, N, H, S)
-
-    # Sharded note: normed_weights will resolve the partial slice_norm
-    # and the output normed_weights will be sharded.
-    # fx has shape (B, N, H, D)
-    # This matmul needs to contract over the tokens
-    # This should produce an output with shape (B, H, S, D)
-
-    # Like the weight norm, this sum is a **partial** sum since we are summing
-    # over the tokens
-
-    # Aggregate features: (B, N, H, S)^T @ (B, N, H, D) -> (B, H, S, D)
-    slice_token = torch.matmul(
-        normed_weights.permute(0, 2, 3, 1), fx.permute(0, 2, 1, 3)
-    )
-
-    # Return the original weights, not the normed weights:
-    return slice_weights, slice_token
+        # Return the original weights, not the normalized weights.
+        return slice_weights, slice_token
 
 
 class PhysicsAttentionBase(nn.Module, ABC):
