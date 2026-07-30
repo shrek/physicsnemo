@@ -1,0 +1,4 @@
+interface:
+  display_name: "PhysicsNeMo Training Performance Tuner"
+  short_description: "Profile and explain PhysicsNeMo training bottlenecks"
+  default_prompt: "Use $physicsnemo-training-performance-tuner to profile my training loop and produce a phase-1 bottleneck report."

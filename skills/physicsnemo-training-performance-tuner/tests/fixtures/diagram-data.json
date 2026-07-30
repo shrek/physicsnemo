@@ -1,0 +1,69 @@
+{
+  "schema_version": "0.1",
+  "pipeline": {
+    "title": "GeoTransolver volume: CPU/GPU pipeline example",
+    "step_id": "ProfilerStep#3",
+    "duration_ms": 100.0,
+    "summary": "GPU busy 55%; dataload and a forward host gap are visible.",
+    "lanes": [
+      {
+        "name": "CPU",
+        "spans": [
+          {"label": "dataload", "start_ms": 0, "end_ms": 30, "category": "data"},
+          {"label": "H2D", "start_ms": 30, "end_ms": 35, "category": "transfer"},
+          {"label": "forward", "start_ms": 35, "end_ms": 70, "category": "forward"},
+          {"label": "backward", "start_ms": 70, "end_ms": 88, "category": "backward"},
+          {"label": "optimizer", "start_ms": 88, "end_ms": 100, "category": "optimizer"}
+        ]
+      },
+      {
+        "name": "GPU",
+        "spans": [
+          {
+            "label": "idle before batch",
+            "start_ms": 0,
+            "end_ms": 27,
+            "category": "bubble",
+            "annotation": "CPU dataload"
+          },
+          {"label": "H2D", "start_ms": 30, "end_ms": 35, "category": "transfer"},
+          {"label": "radius search", "start_ms": 38, "end_ms": 55, "category": "forward"},
+          {
+            "label": "host gap",
+            "start_ms": 55,
+            "end_ms": 61,
+            "category": "bubble",
+            "annotation": "custom-op graph break"
+          },
+          {"label": "forward", "start_ms": 61, "end_ms": 70, "category": "forward"},
+          {"label": "backward", "start_ms": 72, "end_ms": 88, "category": "backward"},
+          {"label": "optimizer", "start_ms": 90, "end_ms": 97, "category": "optimizer"}
+        ]
+      }
+    ]
+  },
+  "forward": {
+    "title": "GeoTransolver volume: forward-pass dominant kernels",
+    "steps": [
+      {
+        "step_id": "ProfilerStep#3",
+        "duration_ms": 35.0,
+        "kernels": [
+          {"label": "radius_search", "family": "radius_search", "category": "radius_search", "start_ms": 2, "end_ms": 12},
+          {"label": "radius_search", "family": "radius_search", "category": "radius_search", "start_ms": 13, "end_ms": 23},
+          {"label": "GEMM", "family": "gemm", "category": "gemm", "start_ms": 24, "end_ms": 28},
+          {"label": "Triton pointwise", "family": "triton", "category": "triton", "start_ms": 28.5, "end_ms": 31},
+          {"label": "attention", "family": "attention", "category": "attention", "start_ms": 31.5, "end_ms": 34}
+        ]
+      }
+    ]
+  },
+  "multi_step": {
+    "title": "GeoTransolver volume: GPU compute and dataload bubbles",
+    "steps": [
+      {"step_id": "step 3", "start_ms": 0, "end_ms": 100, "gpu_busy_start_ms": 30, "gpu_busy_end_ms": 70},
+      {"step_id": "step 4", "start_ms": 100, "end_ms": 200, "gpu_busy_start_ms": 125, "gpu_busy_end_ms": 170},
+      {"step_id": "step 5", "start_ms": 200, "end_ms": 300, "gpu_busy_start_ms": 230, "gpu_busy_end_ms": 275}
+    ]
+  }
+}
