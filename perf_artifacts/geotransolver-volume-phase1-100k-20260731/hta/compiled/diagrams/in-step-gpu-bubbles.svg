@@ -1,0 +1,359 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="285" viewBox="0 0 1400 285">
+<style>
+text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:25px;font-weight:700}.subtitle{font-size:14px;fill:#42526b}.label{font-size:14px}.small{font-size:12px}.lane{font-size:17px;font-weight:700}.grid{stroke:#dce3ec;stroke-width:1}.axis{stroke:#53657a;stroke-width:1.2}
+</style>
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="28" y="38" class="title">In-step GPU idle bubbles</text>
+<text x="28" y="64" class="subtitle">Red spans are explicitly classified bubbles; grey spans are unclassified idle time.</text>
+<line x1="180.0" y1="90" x2="180.0" y2="215" class="grid"/>
+<text x="180.0" y="237" text-anchor="middle" class="small">0.0</text>
+<line x1="388.0" y1="90" x2="388.0" y2="215" class="grid"/>
+<text x="388.0" y="237" text-anchor="middle" class="small">166.5</text>
+<line x1="596.0" y1="90" x2="596.0" y2="215" class="grid"/>
+<text x="596.0" y="237" text-anchor="middle" class="small">332.9</text>
+<line x1="804.0" y1="90" x2="804.0" y2="215" class="grid"/>
+<text x="804.0" y="237" text-anchor="middle" class="small">499.4</text>
+<line x1="1012.0" y1="90" x2="1012.0" y2="215" class="grid"/>
+<text x="1012.0" y="237" text-anchor="middle" class="small">665.8</text>
+<line x1="1220.0" y1="90" x2="1220.0" y2="215" class="grid"/>
+<text x="1220.0" y="237" text-anchor="middle" class="small">832.3</text>
+<text x="162" y="145" text-anchor="end" class="lane">GPU</text>
+<rect x="180" y="112" width="1040" height="52" fill="#59a14f" fill-opacity="0.2" stroke="#8fa0b5"/>
+<rect x="180.0" y="112" width="561.8" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="460.9" y="185" text-anchor="middle" class="small">GPU idle · 449.6 ms</text>
+<rect x="742.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="743.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="743.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="744.2" y="185" text-anchor="middle" class="small">GPU idle · 0.3 ms</text>
+<rect x="743.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="744.6" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="743.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="744.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="744.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="745.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="744.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="745.1" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="744.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="745.4" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="744.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="745.6" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="744.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="745.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="745.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="746.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="745.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="746.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="745.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="746.4" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="745.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="746.7" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="746.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="747.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="746.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="747.2" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="746.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="747.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="746.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="747.5" y="185" text-anchor="middle" class="small">GPU idle · 0.4 ms</text>
+<rect x="747.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="748.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="747.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="748.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="747.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="748.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="747.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="748.6" y="185" text-anchor="middle" class="small">GPU idle · 0.6 ms</text>
+<rect x="748.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="749.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="748.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="749.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="748.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="749.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="749.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="750.0" y="185" text-anchor="middle" class="small">GPU idle · 0.6 ms</text>
+<rect x="749.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="750.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="750.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="751.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="750.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="751.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="752.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="753.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="752.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="753.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="752.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="753.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="752.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="753.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="752.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="753.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="753.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="754.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="753.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="754.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="753.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="754.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="753.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="754.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="753.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="754.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="753.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="754.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="754.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="755.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="754.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="755.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="754.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="755.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="755.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="756.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="755.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="756.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="755.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="756.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="755.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="756.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="755.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="756.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="755.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="756.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="756.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="757.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="756.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="757.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="756.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="757.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="756.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="757.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="756.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="757.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="757.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="758.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="757.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="758.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="757.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="758.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="758.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="759.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="758.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="759.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="758.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="759.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="758.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="759.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="759.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="760.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="759.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="760.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="759.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="760.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="760.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="761.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="760.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="761.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="760.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="761.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="760.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="761.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="760.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="761.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="761.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="762.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="761.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="762.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="764.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="765.5" y="185" text-anchor="middle" class="small">GPU idle · 0.3 ms</text>
+<rect x="765.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="766.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="765.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="766.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="765.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="766.8" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="784.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="785.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="785.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="786.0" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="785.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="786.3" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="785.5" y="112" width="2.1" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="786.6" y="185" text-anchor="middle" class="small">GPU idle · 1.7 ms</text>
+<rect x="787.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="788.6" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="787.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="788.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="788.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="789.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="788.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="789.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="788.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="789.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="788.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="789.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="788.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="789.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="788.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="789.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="788.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="789.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="788.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="789.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="789.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="790.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="789.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="790.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="789.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="790.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="789.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="790.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="789.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="790.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="790.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="791.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="790.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="791.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="790.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="791.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="790.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="791.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="790.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="791.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="790.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="791.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="790.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="791.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="790.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="791.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="791.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="792.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="791.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="792.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="791.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="792.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="791.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="792.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="791.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="792.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="792.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="793.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="792.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="793.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="792.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="793.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="792.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="793.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="792.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="793.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="792.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="793.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="792.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="793.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="793.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="794.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="793.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="794.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="793.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="794.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="793.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="794.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="793.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="794.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="793.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="794.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="793.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="794.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="794.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="795.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="794.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="795.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="795.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="796.6" y="185" text-anchor="middle" class="small">GPU idle · 0.3 ms</text>
+<rect x="796.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="797.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="796.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="797.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="796.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="797.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="798.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="799.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="798.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="799.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="800.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="801.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="800.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="801.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="803.4" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="804.4" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="803.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="804.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="806.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="807.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="806.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="807.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="822.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="823.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="822.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="823.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="837.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="838.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="837.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="838.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="852.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="853.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="853.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="854.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="868.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="869.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="897.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="898.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="898.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="899.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="898.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="899.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="929.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="930.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="962.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="963.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1056.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1057.9" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="1057.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1058.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1057.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1058.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1057.6" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1058.6" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1057.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1058.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1059.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1060.0" y="185" text-anchor="middle" class="small">GPU idle · 1.5 ms</text>
+<rect x="1060.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1061.9" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="1061.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1062.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1061.2" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1062.2" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1061.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1062.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1061.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1062.5" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1061.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1062.8" y="185" text-anchor="middle" class="small">GPU idle · 0.4 ms</text>
+<rect x="1062.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1063.3" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1062.5" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1063.5" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="1062.8" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1063.8" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1062.9" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1063.9" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1063.0" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1064.0" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1063.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1064.1" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1063.3" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1064.3" y="185" text-anchor="middle" class="small">GPU idle · 0.2 ms</text>
+<rect x="1063.7" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1064.7" y="185" text-anchor="middle" class="small">GPU idle · 0.1 ms</text>
+<rect x="1209.8" y="112" width="10.2" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1214.9" y="185" text-anchor="middle" class="small">GPU idle · 8.1 ms</text>
+<text x="180" y="248" class="subtitle">Total classified idle: 479.1 ms (57.6% of step).</text>
+</svg>

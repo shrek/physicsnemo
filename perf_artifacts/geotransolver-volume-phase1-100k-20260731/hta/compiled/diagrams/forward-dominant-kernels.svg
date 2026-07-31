@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="670" viewBox="0 0 1400 670">
+<style>
+text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:25px;font-weight:700}.subtitle{font-size:14px;fill:#42526b}.label{font-size:14px}.small{font-size:12px}.lane{font-size:17px;font-weight:700}.grid{stroke:#dce3ec;stroke-width:1}.axis{stroke:#53657a;stroke-width:1.2}
+</style>
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="28" y="38" class="title">GeoTransolver volume 100k (compiled): forward dominant kernels</text>
+<text x="28" y="64" class="subtitle">Kernel families are ordered by total GPU time; the CPU forward span provides the wall-time boundary.</text>
+<rect x="18" y="74" width="1364" height="247" rx="8" fill="#ffffff" stroke="#d8e0ea"/>
+<text x="35" y="100" class="lane">ProfilerStep#6</text>
+<line x1="180.0" y1="122" x2="180.0" y2="272" class="grid"/>
+<text x="180.0" y="294" text-anchor="middle" class="small">0.0</text>
+<line x1="388.0" y1="122" x2="388.0" y2="272" class="grid"/>
+<text x="388.0" y="294" text-anchor="middle" class="small">30.5</text>
+<line x1="596.0" y1="122" x2="596.0" y2="272" class="grid"/>
+<text x="596.0" y="294" text-anchor="middle" class="small">61.0</text>
+<line x1="804.0" y1="122" x2="804.0" y2="272" class="grid"/>
+<text x="804.0" y="294" text-anchor="middle" class="small">91.5</text>
+<line x1="1012.0" y1="122" x2="1012.0" y2="272" class="grid"/>
+<text x="1012.0" y="294" text-anchor="middle" class="small">122.1</text>
+<line x1="1220.0" y1="122" x2="1220.0" y2="272" class="grid"/>
+<text x="1220.0" y="294" text-anchor="middle" class="small">152.6</text>
+<text x="168" y="142" text-anchor="end" class="label">CPU forward</text>
+<rect x="180" y="126" width="1040" height="20" rx="3" fill="#cfd8e6" stroke="#9aabc0"/>
+<text x="168" y="171" text-anchor="end" class="label">radius_search</text>
+<rect x="238.9" y="156" width="8.1" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 1.183 ms</title></rect>
+<rect x="249.4" y="156" width="8.1" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 1.181 ms</title></rect>
+<rect x="259.6" y="156" width="16.0" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 2.344 ms</title></rect>
+<rect x="277.8" y="156" width="15.3" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 2.249 ms</title></rect>
+<rect x="295.4" y="156" width="82.4" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 12.086 ms</title></rect>
+<text x="336.6" y="170" text-anchor="middle" class="small" style="fill:#ffffff">12.1</text>
+<rect x="380.1" y="156" width="80.3" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 11.773 ms</title></rect>
+<text x="420.2" y="170" text-anchor="middle" class="small" style="fill:#ffffff">11.8</text>
+<rect x="462.7" y="156" width="82.4" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 12.088 ms</title></rect>
+<text x="503.9" y="170" text-anchor="middle" class="small" style="fill:#ffffff">12.1</text>
+<rect x="547.4" y="156" width="77.9" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 11.429 ms</title></rect>
+<text x="586.3" y="170" text-anchor="middle" class="small" style="fill:#ffffff">11.4</text>
+<rect x="630.2" y="156" width="160.3" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 23.517 ms</title></rect>
+<text x="710.3" y="170" text-anchor="middle" class="small" style="fill:#ffffff">23.5</text>
+<rect x="794.0" y="156" width="164.9" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 24.196 ms</title></rect>
+<text x="876.4" y="170" text-anchor="middle" class="small" style="fill:#ffffff">24.2</text>
+<rect x="963.2" y="156" width="177.6" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 26.053 ms</title></rect>
+<text x="1052.0" y="170" text-anchor="middle" class="small" style="fill:#ffffff">26.1</text>
+<rect x="1144.5" y="156" width="75.5" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 11.073 ms</title></rect>
+<text x="1182.3" y="170" text-anchor="middle" class="small" style="fill:#ffffff">11.1</text>
+<text x="1232" y="171" class="small">139.17 ms (12)</text>
+<text x="168" y="201" text-anchor="end" class="label">gemm</text>
+<rect x="625.7" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_2x1_v_bz_coopA_bias_NNN: 0.032 ms</title></rect>
+<rect x="626.2" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.032 ms</title></rect>
+<rect x="626.5" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.033 ms</title></rect>
+<rect x="626.7" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.032 ms</title></rect>
+<rect x="627.2" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.033 ms</title></rect>
+<rect x="627.5" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.033 ms</title></rect>
+<rect x="791.1" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.032 ms</title></rect>
+<rect x="791.4" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.033 ms</title></rect>
+<rect x="959.6" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x288_64x4_2x1_v_bz_coopA_bias_NNT: 0.043 ms</title></rect>
+<rect x="960.4" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.065 ms</title></rect>
+<rect x="1141.4" y="186" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN: 0.036 ms</title></rect>
+<text x="1232" y="201" class="small">0.40 ms (11)</text>
+<text x="168" y="231" text-anchor="end" class="label">triton</text>
+<rect x="790.5" y="216" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused__to_copy_view_42: 0.038 ms</title></rect>
+<rect x="958.9" y="216" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused__to_copy_view_42: 0.039 ms</title></rect>
+<rect x="959.9" y="216" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused_gelu_view_43: 0.078 ms</title></rect>
+<rect x="960.9" y="216" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused_cat_view_44: 0.033 ms</title></rect>
+<rect x="1140.8" y="216" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused__to_copy_view_45: 0.077 ms</title></rect>
+<text x="1232" y="231" class="small">0.27 ms (5)</text>
+<text x="168" y="261" text-anchor="end" class="label">other</text>
+<rect x="962.7" y="246" width="1.2" height="20" rx="2" fill="#94a3b8"><title>void at::native::vectorized_elementwise_kernel&lt;4, at::native::FillFunctor&lt;f…: 0.046 ms</title></rect>
+<rect x="1144.0" y="246" width="1.2" height="20" rx="2" fill="#94a3b8"><title>void at::native::vectorized_elementwise_kernel&lt;4, at::native::FillFunctor&lt;f…: 0.047 ms</title></rect>
+<text x="1232" y="261" class="small">0.09 ms (2)</text>
+<rect x="18" y="329" width="1364" height="247" rx="8" fill="#ffffff" stroke="#d8e0ea"/>
+<text x="35" y="355" class="lane">ProfilerStep#7</text>
+<line x1="180.0" y1="377" x2="180.0" y2="527" class="grid"/>
+<text x="180.0" y="549" text-anchor="middle" class="small">0.0</text>
+<line x1="388.0" y1="377" x2="388.0" y2="527" class="grid"/>
+<text x="388.0" y="549" text-anchor="middle" class="small">30.9</text>
+<line x1="596.0" y1="377" x2="596.0" y2="527" class="grid"/>
+<text x="596.0" y="549" text-anchor="middle" class="small">61.7</text>
+<line x1="804.0" y1="377" x2="804.0" y2="527" class="grid"/>
+<text x="804.0" y="549" text-anchor="middle" class="small">92.6</text>
+<line x1="1012.0" y1="377" x2="1012.0" y2="527" class="grid"/>
+<text x="1012.0" y="549" text-anchor="middle" class="small">123.5</text>
+<line x1="1220.0" y1="377" x2="1220.0" y2="527" class="grid"/>
+<text x="1220.0" y="549" text-anchor="middle" class="small">154.3</text>
+<text x="168" y="397" text-anchor="end" class="label">CPU forward</text>
+<rect x="180" y="381" width="1040" height="20" rx="3" fill="#cfd8e6" stroke="#9aabc0"/>
+<text x="168" y="426" text-anchor="end" class="label">radius_search</text>
+<rect x="253.1" y="411" width="9.1" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 1.344 ms</title></rect>
+<rect x="264.6" y="411" width="9.3" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 1.373 ms</title></rect>
+<rect x="275.9" y="411" width="15.8" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 2.344 ms</title></rect>
+<rect x="293.8" y="411" width="16.2" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 2.402 ms</title></rect>
+<rect x="312.0" y="411" width="77.8" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 11.543 ms</title></rect>
+<text x="350.9" y="425" text-anchor="middle" class="small" style="fill:#ffffff">11.5</text>
+<rect x="392.3" y="411" width="74.7" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 11.086 ms</title></rect>
+<text x="429.6" y="425" text-anchor="middle" class="small" style="fill:#ffffff">11.1</text>
+<rect x="469.3" y="411" width="75.9" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 11.267 ms</title></rect>
+<text x="507.3" y="425" text-anchor="middle" class="small" style="fill:#ffffff">11.3</text>
+<rect x="547.5" y="411" width="75.5" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 11.198 ms</title></rect>
+<text x="585.3" y="425" text-anchor="middle" class="small" style="fill:#ffffff">11.2</text>
+<rect x="627.7" y="411" width="163.1" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 24.205 ms</title></rect>
+<text x="709.3" y="425" text-anchor="middle" class="small" style="fill:#ffffff">24.2</text>
+<rect x="794.1" y="411" width="163.2" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 24.218 ms</title></rect>
+<text x="875.7" y="425" text-anchor="middle" class="small" style="fill:#ffffff">24.2</text>
+<rect x="961.6" y="411" width="175.7" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 26.077 ms</title></rect>
+<text x="1049.5" y="425" text-anchor="middle" class="small" style="fill:#ffffff">26.1</text>
+<rect x="1140.7" y="411" width="79.3" height="20" rx="2" fill="#c94c16"><title>radius_search_limited_select_batched_2985e173_cuda_kernel_forward: 11.770 ms</title></rect>
+<text x="1180.3" y="425" text-anchor="middle" class="small" style="fill:#ffffff">11.8</text>
+<text x="1232" y="426" class="small">138.83 ms (12)</text>
+<text x="168" y="456" text-anchor="end" class="label">gemm</text>
+<rect x="623.9" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.032 ms</title></rect>
+<rect x="624.6" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.033 ms</title></rect>
+<rect x="625.1" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.033 ms</title></rect>
+<rect x="625.6" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.031 ms</title></rect>
+<rect x="791.5" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.034 ms</title></rect>
+<rect x="791.8" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.033 ms</title></rect>
+<rect x="958.0" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x288_64x4_2x1_v_bz_coopA_bias_NNT: 0.042 ms</title></rect>
+<rect x="958.8" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.066 ms</title></rect>
+<rect x="1137.9" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN: 0.035 ms</title></rect>
+<rect x="1138.4" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.032 ms</title></rect>
+<rect x="1138.6" y="441" width="1.2" height="20" rx="2" fill="#2f62e8"><title>nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN: 0.034 ms</title></rect>
+<text x="1232" y="456" class="small">0.41 ms (11)</text>
+<text x="168" y="486" text-anchor="end" class="label">triton</text>
+<rect x="790.9" y="471" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused__to_copy_view_42: 0.037 ms</title></rect>
+<rect x="957.4" y="471" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused__to_copy_view_42: 0.038 ms</title></rect>
+<rect x="958.3" y="471" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused_gelu_view_43: 0.079 ms</title></rect>
+<rect x="959.3" y="471" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused_cat_view_44: 0.035 ms</title></rect>
+<rect x="1137.3" y="471" width="1.2" height="20" rx="2" fill="#0b996e"><title>triton_poi_fused__to_copy_view_45: 0.077 ms</title></rect>
+<text x="1232" y="486" class="small">0.27 ms (5)</text>
+<text x="168" y="516" text-anchor="end" class="label">other</text>
+<rect x="961.1" y="501" width="1.2" height="20" rx="2" fill="#94a3b8"><title>void at::native::vectorized_elementwise_kernel&lt;4, at::native::FillFunctor&lt;f…: 0.046 ms</title></rect>
+<rect x="1140.2" y="501" width="1.2" height="20" rx="2" fill="#94a3b8"><title>void at::native::vectorized_elementwise_kernel&lt;4, at::native::FillFunctor&lt;f…: 0.047 ms</title></rect>
+<text x="1232" y="516" class="small">0.09 ms (2)</text>
+</svg>
