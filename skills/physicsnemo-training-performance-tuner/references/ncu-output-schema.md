@@ -7,6 +7,7 @@ The NCU subdirectory contains:
 | `doctor.json` | yes | Tool, version, section, and GPU visibility |
 | `workload.json` | yes | Shell-free workload argv, cwd, and scoped env |
 | `capture-spec.json` | yes | Reviewable filters, launch bound, and question |
+| `capture-approval.json` | yes | Explicit user confirmation bound to the spec hash |
 | `capture-manifest.json` | yes | Exact argv, result, failure class, and paths |
 | `capture.log` | yes | NCU stdout and stderr |
 | `<candidate>.ncu-rep` | successful capture | Native report |
@@ -53,3 +54,21 @@ The JSON summary deliberately keeps raw metric rows because metric names and
 section contents vary across NCU versions. Its `interpretation` is a small,
 reviewable conclusion written after inspecting the relevant metrics. It must
 not contain a measured speedup derived from NCU replay timing.
+
+
+`capture-approval.json` is created only after the exact `capture --print-only`
+output is shown and explicitly confirmed:
+
+```json
+{
+  "schema_version": "0.1",
+  "status": "approved",
+  "spec": "capture-spec.json",
+  "spec_sha256": "<sha256>",
+  "confirmed_at_utc": "<timestamp>",
+  "confirmation_source": "user confirmed exact print-only plan"
+}
+```
+
+An actual capture must reject a missing approval or a hash that no longer
+matches the current spec. `doctor.json` does not substitute for this artifact.

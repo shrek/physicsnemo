@@ -106,6 +106,18 @@ class NcuProfileTest(unittest.TestCase):
             spec_path.write_text(json.dumps(capture_spec(root)))
 
             parser = ncu_profile.build_parser()
+            approval_path = root / "capture-approval.json"
+            approve_args = parser.parse_args(
+                [
+                    "approve",
+                    str(spec_path),
+                    "--output",
+                    str(approval_path),
+                    "--confirmation-source",
+                    "user confirmed exact print-only plan",
+                ]
+            )
+            self.assertEqual(ncu_profile.cmd_approve(approve_args), 0)
             capture_args = parser.parse_args(
                 [
                     "capture",
@@ -114,6 +126,8 @@ class NcuProfileTest(unittest.TestCase):
                     str(fake_ncu),
                     "--manifest",
                     str(root / "capture-manifest.json"),
+                    "--approval",
+                    str(approval_path),
                 ]
             )
             self.assertEqual(ncu_profile.cmd_capture(capture_args), 0)
@@ -133,6 +147,31 @@ class NcuProfileTest(unittest.TestCase):
             summary = json.loads((root / "H003-summary.json").read_text())
             self.assertEqual(summary["row_count"], 1)
             self.assertEqual(summary["rows"][0]["Kernel Name"], "radius_search")
+
+    def test_capture_requires_approval_bound_to_current_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            spec_path = root / "capture-spec.json"
+            spec_path.write_text(json.dumps(capture_spec(root)))
+            approval_path = root / "capture-approval.json"
+            with self.assertRaisesRegex(ncu_profile.UserError, "approval is missing"):
+                ncu_profile.require_capture_approval(spec_path, approval_path)
+            approval_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "0.1",
+                        "status": "approved",
+                        "spec_sha256": ncu_profile.sha256_file(spec_path),
+                        "confirmation_source": "user confirmation",
+                    }
+                )
+            )
+            ncu_profile.require_capture_approval(spec_path, approval_path)
+            spec = capture_spec(root)
+            spec["selection"]["launch_count"] = 2
+            spec_path.write_text(json.dumps(spec))
+            with self.assertRaisesRegex(ncu_profile.UserError, "changed after approval"):
+                ncu_profile.require_capture_approval(spec_path, approval_path)
 
     def test_permission_failure_is_classified(self) -> None:
         self.assertEqual(

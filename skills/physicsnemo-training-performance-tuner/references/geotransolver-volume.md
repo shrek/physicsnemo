@@ -18,11 +18,16 @@ Resolve paths from the PhysicsNeMo repository root:
 - Dataset config: `datasets/drivaer_ml_volume.yaml`
 - Model selection: `model=geotransolver_volume`
 - Dataset selection: `dataset=drivaer_ml_volume`
-- Compile mode: `compile=true`
+- Paired compile modes: `compile=false` and `compile=true`
 
-The minimal command is:
+The minimal paired commands are:
 
 ```bash
+python src/train.py \
+  model=geotransolver_volume \
+  dataset=drivaer_ml_volume \
+  compile=false
+
 python src/train.py \
   model=geotransolver_volume \
   dataset=drivaer_ml_volume \
@@ -36,9 +41,11 @@ the test environment. Record every override in the run manifest.
 
 - Start with one GPU.
 - Use bf16 when supported and record the resolved precision.
-- Warm the dataloader, allocator, and compiled graph before measurement.
-- Collect at least three unprofiled repetitions.
-- Capture five steady-state profiler iterations.
+- Warm the dataloader and allocator for both variants; warm the compiled graph
+  before compiled steady-state measurement.
+- Record compiled cold-start cost separately.
+- Collect at least three unprofiled repetitions per variant.
+- Capture the same five steady-state profiler iterations per variant.
 - Use a representative DrivAerML volume sample, not a tiny synthetic mesh.
 - Use finite loss, output/target shape agreement, and loss parity against the
   unprofiled smoke run as the initial correctness contract.
@@ -65,11 +72,14 @@ event into a phase when the trace cannot support the mapping.
 
 Use the standard HolisticTraceAnalysis sequence from `SKILL.md`. In addition:
 
-- Compare total GPU busy time with full CPU `ProfilerStep` wall time.
+- Compare eager and compiled total GPU busy time with each validated logical-step
+  wall time, and state whether each boundary is native, explicit, or reconstructed.
 - Separate in-step idle from inter-step dataload bubbles.
 - Group forward kernels into radius search, BVH/SDF, attention, GEMM, Triton
   pointwise/reduction, memory, and other families when symbols permit.
-- Inspect consecutive steady-state iterations because volume sample sizes vary.
+- Inspect matching consecutive steady-state iterations because volume sample
+  sizes vary.
+- List graph breaks and recompilations from a separate bounded compiled diagnostic.
 - State whether a diagram includes dataloading in the step boundary.
 - Generate the CPU/GPU step pipeline and forward dominant-kernel views.
 - Generate the in-step idle-bubble view when custom operations cause host gaps.
@@ -142,7 +152,8 @@ For a radius-search candidate:
 
 - Prefer a stable kernel regex such as `.*radius_search.*`.
 - Add an NVTX selector when the training loop exposes a neighbor-search range.
-- Capture no more than ten launches with the `default` set first.
+- Capture no more than ten launches with the `default` set first, only after the
+  exact print-only plan receives separate fingerprint-bound user approval.
 - Ask whether memory traffic, occupancy, dependency latency, or candidate
   scanning explains the observed kernel cost.
 - Run a focused second pass only when the first-pass metrics justify it.

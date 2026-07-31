@@ -12,13 +12,19 @@ _Run: `{{RUN_ID}}` · Date: `{{DATE}}` · Commit: `{{GIT_COMMIT}}`_
 | Item | Value |
 |---|---|
 | Entry point | {{ENTRY_POINT}} |
-| Launch command | `{{COMMAND}}` |
+| Eager command | `{{EAGER_COMMAND}}` |
+| Compiled command | `{{COMPILED_COMMAND}}` |
+| Compile backend/mode | {{COMPILE_BACKEND}} / {{COMPILE_MODE}} |
+| Compile fullgraph/dynamic | {{COMPILE_FULLGRAPH}} / {{COMPILE_DYNAMIC}} |
 | Model/config | {{MODEL_CONFIG}} |
 | Dataset/sample | {{DATASET}} |
 | Batch/sample size | {{BATCH_SIZE}} |
-| Precision/compile | {{PRECISION_COMPILE}} |
+| Precision | {{PRECISION_COMPILE}} |
 | Hardware | {{HARDWARE}} |
 | Distributed strategy | {{DISTRIBUTED}} |
+
+The tested configuration was shown to the user before workload execution and
+confirmed against the fingerprint recorded in `config-confirmation.json`.
 
 ## Benchmark protocol
 
@@ -34,19 +40,62 @@ _Run: `{{RUN_ID}}` · Date: `{{DATE}}` · Commit: `{{GIT_COMMIT}}`_
 Describe synchronization, sample ordering, profiler-disabled baseline timing,
 and any deviations from the manifest.
 
-## Baseline performance
+## Paired eager and compiled baseline
 
-| Metric | Median | Dispersion | Unit |
-|---|---:|---:|---|
-| Step time | {{STEP_TIME}} | {{STEP_TIME_DISPERSION}} | ms |
-| Throughput | {{THROUGHPUT}} | {{THROUGHPUT_DISPERSION}} | {{THROUGHPUT_UNIT}} |
-| Peak GPU allocated | {{GPU_ALLOCATED}} | — | MiB |
-| Peak GPU reserved | {{GPU_RESERVED}} | — | MiB |
-| Data wait | {{DATA_WAIT}} | {{DATA_WAIT_DISPERSION}} | ms |
+| Metric | Eager | Compiled steady state | Delta/ratio | Unit |
+|---|---:|---:|---:|---|
+| Step time median | {{EAGER_STEP_TIME}} | {{COMPILED_STEP_TIME}} | {{STEP_TIME_DELTA}} | ms |
+| Step-time dispersion | {{EAGER_STEP_DISPERSION}} | {{COMPILED_STEP_DISPERSION}} | — | ms |
+| Throughput | {{EAGER_THROUGHPUT}} | {{COMPILED_THROUGHPUT}} | {{THROUGHPUT_DELTA}} | {{THROUGHPUT_UNIT}} |
+| Peak GPU allocated | {{EAGER_GPU_ALLOCATED}} | {{COMPILED_GPU_ALLOCATED}} | {{GPU_ALLOCATED_DELTA}} | MiB |
+| Data wait | {{EAGER_DATA_WAIT}} | {{COMPILED_DATA_WAIT}} | {{DATA_WAIT_DELTA}} | ms |
 
-## Traces
+| Compilation item | Result |
+|---|---:|
+| Cold compilation time | {{COMPILE_TIME}} ms |
+| First compiled step | {{FIRST_COMPILED_STEP}} ms |
+| Compile cache state | {{COMPILE_CACHE_STATE}} |
+| Steady-state speedup | {{COMPILE_SPEEDUP}} |
+| Estimated amortization | {{AMORTIZATION_STEPS}} steps |
+| Classification | {{COMPILE_CLASSIFICATION}} |
 
-List each trace, rank, active iteration, compile mode, and HTA analysis input.
+Speedup must come from unprofiled steady-state measurements. Do not include
+cold compilation, verbose compiler logging, or profiler overhead.
+
+## Paired traces
+
+List eager and compiled traces, rank, active iteration, annotation-health result,
+and HTA analysis input. State whether the same samples and logical steps were
+used.
+
+## Annotation health and step provenance
+
+| Item | Eager | Compiled |
+|---|---|---|
+| Logical-step provenance | {{EAGER_STEP_PROVENANCE}} | {{COMPILED_STEP_PROVENANCE}} |
+| Boundary/selection rule | {{EAGER_STEP_BOUNDARY}} | {{COMPILED_STEP_BOUNDARY}} |
+| Required phase coverage | {{EAGER_ANNOTATION_COVERAGE}} | {{COMPILED_ANNOTATION_COVERAGE}} |
+| Duplicate projected annotations | {{EAGER_PROJECTED_ANNOTATIONS}} | {{COMPILED_PROJECTED_ANNOTATIONS}} |
+| Timestamp/end handling | {{EAGER_TIMESTAMP_HANDLING}} | {{COMPILED_TIMESTAMP_HANDLING}} |
+| Compile annotation warning | {{EAGER_COMPILE_WARNING}} | {{COMPILED_COMPILE_WARNING}} |
+
+State whether each boundary is a native `ProfilerStep`, an explicit `train_step`,
+or a reconstructed logical step. Link both annotation-health artifacts and
+describe fallbacks without presenting reconstructed boundaries as native output.
+
+## torch.compile diagnostics
+
+| Diagnostic | Result | Evidence |
+|---|---:|---|
+| Unique graph breaks | {{GRAPH_BREAK_COUNT}} | {{GRAPH_BREAK_EVIDENCE}} |
+| Graph-break occurrences | {{GRAPH_BREAK_OCCURRENCES}} | {{GRAPH_BREAK_EVIDENCE}} |
+| Unique recompilations | {{RECOMPILE_COUNT}} | {{RECOMPILE_EVIDENCE}} |
+| Recompilation occurrences | {{RECOMPILE_OCCURRENCES}} | {{RECOMPILE_EVIDENCE}} |
+| Cache-limit warnings | {{CACHE_LIMIT_WARNINGS}} | {{COMPILE_LOG}} |
+| Backend failure/eager fallback | {{COMPILE_FALLBACK}} | {{COMPILE_LOG}} |
+
+List each graph-break source location, reason, and count. List recompilation
+failed guards. Treat this as diagnostic evidence, not benchmark timing.
 
 ## Whole-trace temporal breakdown
 
@@ -76,17 +125,29 @@ List each trace, rank, active iteration, compile mode, and HTA analysis input.
 
 ## CPU/GPU step pipeline
 
-![Annotated CPU/GPU lanes](hta/diagrams/cpu-gpu-pipeline.svg)
+### Eager
 
-Define the ProfilerStep boundary, stage taxonomy, GPU busy time, idle time, and
-the cause of each annotated bubble.
+![Eager annotated CPU/GPU lanes](hta/eager/diagrams/cpu-gpu-pipeline.svg)
+
+### Compiled
+
+![Compiled annotated CPU/GPU lanes](hta/compiled/diagrams/cpu-gpu-pipeline.svg)
+
+Compare validated logical-step provenance, stage taxonomy, GPU busy time, idle
+time, launches, and the cause of each annotated bubble.
 
 ## Forward-pass dominant kernels
 
-![Forward-pass kernel-family timeline](hta/diagrams/forward-dominant-kernels.svg)
+### Eager
 
-Explain the dominant kernel family, its aggregate time and launch count, and
-whether its cost changes the next recommendation.
+![Eager forward kernel timeline](hta/eager/diagrams/forward-dominant-kernels.svg)
+
+### Compiled
+
+![Compiled forward kernel timeline](hta/compiled/diagrams/forward-dominant-kernels.svg)
+
+Explain changes in dominant kernel families, aggregate time, launch count,
+compiled/fused regions, and whether the critical path changes.
 
 ## NCU kernel analysis
 
@@ -169,13 +230,20 @@ These are recommendations, not measured improvements.
 |---|---|
 | `run-manifest.json` | Resolved reproducibility contract |
 | `baseline.json` | Raw and aggregate unprofiled measurements |
+| `test-config.json` | Machine-readable configuration shown for confirmation |
+| `test-config.md` | Human-readable configuration confirmation block |
+| `config-confirmation.json` | User-confirmed test-config fingerprint |
 | `correctness.json` | Correctness result and evidence |
+| `annotation-health-eager.json` | Eager annotation integrity and step provenance |
+| `annotation-health-compiled.json` | Compiled annotation integrity and step provenance |
+| `compile-analysis.json` | Graph breaks, recompilations, and fallback diagnostics |
+| `compile-comparison.json` | Paired steady-state and trace conclusion |
 | `findings.json` | Machine-readable ranked recommendations |
 | `phase-source-map.json` | Trace-phase to source/configuration mapping |
 | `source-analysis.json` | Code observations and phase-2 recommendations |
-| `traces/` | Kineto traces |
-| `hta/` | HolisticTraceAnalysis tables and diagrams |
-| `hta/diagram-data.json` | Normalized spans used for report diagrams |
-| `hta/diagrams/diagram-manifest.json` | Generated diagram inventory |
+| `traces/eager/`, `traces/compiled/` | Paired Kineto traces |
+| `hta/eager/`, `hta/compiled/` | Paired HTA tables and diagrams |
+| `hta/<variant>/diagram-data.json` | Normalized paired diagram spans |
+| `hta/<variant>/diagrams/diagram-manifest.json` | Per-variant diagram inventory |
 | `ncu/` | Conditional Nsight Compute reports |
 | `logs/` | Smoke, baseline, and profiling logs |

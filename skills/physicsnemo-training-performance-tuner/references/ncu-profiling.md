@@ -16,7 +16,9 @@ python scripts/ncu_profile.py doctor --output <bundle>/ncu/doctor.json
 
 The command checks `--ncu`, then `PATH`, then `/usr/local/cuda/bin/ncu`. A
 non-ready result is evidence to record, not permission to install software,
-change driver policy, use `sudo`, or add container capabilities.
+change driver policy, use `sudo`, or add container capabilities. A ready result
+proves executable and GPU discovery only; it does not prove counter permission
+for the planned workload and is not user approval to capture.
 
 ## 2. Record one HTA candidate
 
@@ -70,14 +72,32 @@ The default captures at most ten launches with NCU's `default` set. The
 validator rejects `--set full`, more than 100 launches, and captures over ten
 launches that have no kernel filter, NVTX filter, or profiler gate. Existing
 reports are not overwritten unless the plan explicitly records
-`force_overwrite`.
+`force_overwrite`. `--print-only` works even when `ncu` is absent so the proposed
+command can still be reviewed.
+
+Show the exact print-only output to the user and ask for separate explicit
+confirmation. After confirmation, bind it to the current spec fingerprint:
+
+```bash
+python scripts/ncu_profile.py approve \
+  <bundle>/ncu/capture-spec.json \
+  --output <bundle>/ncu/capture-approval.json \
+  --confirmation-source 'user confirmed exact print-only plan'
+```
+
+Any spec change invalidates this approval and requires the plan to be shown and
+confirmed again. If `ncu` is unavailable, record it and skip capture; do not
+install it or change the platform unless the user separately authorizes that
+operation.
 
 ## 4. Capture and summarize
 
 Run:
 
 ```bash
-python scripts/ncu_profile.py capture <bundle>/ncu/capture-spec.json
+python scripts/ncu_profile.py capture \
+  <bundle>/ncu/capture-spec.json \
+  --approval <bundle>/ncu/capture-approval.json
 
 python scripts/ncu_profile.py summarize \
   <bundle>/ncu/H003-default.ncu-rep \
@@ -112,5 +132,6 @@ version. Keep the second pass narrow.
   changes and require explicit user approval.
 - NCU replay perturbs execution. Use it to explain a kernel, never to claim
   end-to-end speedup.
-- Preserve the capture spec, manifest, log, `.ncu-rep`, normalized summary, NCU
-  version, and the HTA candidate that justified the run.
+- Preserve the capture spec, fingerprint-bound approval, manifest, log,
+  `.ncu-rep`, normalized summary, NCU version, and the HTA candidate that
+  justified the run.

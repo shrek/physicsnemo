@@ -2,12 +2,49 @@
 
 ## Contents
 
-1. Benchmark contract
-2. Instrumentation contract
-3. Evidence contract
-4. Hotspot routing
-5. NCU decision gate
-6. Report contract
+1. Configuration confirmation contract
+2. Benchmark contract
+3. Instrumentation contract
+4. Evidence contract
+5. Hotspot routing
+6. NCU decision gate
+7. Report contract
+
+## Configuration confirmation contract
+
+Resolve and display the exact performance-relevant test configuration before
+executing the workload. The confirmation block must include:
+
+- Working directory, complete launch command, source revision, and local patch
+  state.
+- Entry point, model/config, and full resolved-config artifact when available.
+- Dataset path or identifier, split, sample selection and ordering, batch/sample
+  size, and sampling resolution.
+- Seed/determinism, precision, GPU count/type, distributed mode, and dataloader
+  settings.
+- Complete eager (`torch.compile=false`) and compiled (`torch.compile=true`)
+  commands plus backend, mode, fullgraph, dynamic-shape, and cache settings.
+- Warmup, measured, profiled, and repetition budgets.
+- Correctness signal, performance goal, synchronization method, and artifact
+  output.
+
+Mark unknown values explicitly; do not silently substitute defaults. Ask one
+targeted question for a missing command, representative dataset, or correctness
+signal.
+
+Require explicit user confirmation after displaying the configuration. A
+request to run the tuner or approval of a plan is not configuration
+confirmation. Do not run a smoke test, baseline, Kineto capture, or NCU before
+confirmation.
+
+Store the displayed configuration in `test-config.json` and `test-config.md`.
+Store confirmation separately in `config-confirmation.json`, bound to the
+SHA-256 fingerprint of `test-config.json`. Re-display and reconfirm whenever the
+fingerprint changes. Validate the gate with:
+
+```bash
+python scripts/validate_phase1_bundle.py <artifact-dir> --confirmed
+```
 
 ## Benchmark contract
 
@@ -17,14 +54,18 @@ Keep the following invariant across comparable runs:
 - Dataset, split, sample selection, and sample ordering.
 - Batch size and sampling resolution.
 - Seed and deterministic settings.
-- Precision, compile mode, and gradient accumulation.
-- GPU model/count, distributed strategy, and launch command.
+- Precision and gradient accumulation.
+- GPU model/count and distributed strategy.
+- Launch command apart from the explicit compile state/options under comparison.
 - Warmup count, measured-step count, and synchronization points.
 
-Run a smoke test before spending the profiling budget. Run the baseline without
-the PyTorch profiler or NCU. Use at least three repetitions by default and report
-the median plus dispersion. Store raw per-step measurements so an aggregate can
-be recomputed.
+Run correctness and a smoke test for eager and compiled variants before spending
+the profiling budget. Run both baselines without the PyTorch profiler, compile
+logging, or NCU. Measure compiled cold start separately, warm the compiled path,
+and use at least three steady-state repetitions per variant by default. Report
+the median plus dispersion and store raw per-step measurements so aggregates can
+be recomputed. Derive speedup only from unprofiled steady-state measurements.
+Read `references/compile-comparison.md` for the paired protocol.
 
 Record:
 
@@ -62,9 +103,23 @@ train_step
   checkpoint
 ```
 
-Place `profiler.step()` exactly once per logical training step. Warm the model,
-compiler, dataloader, and allocator before the active trace window. In
-distributed runs, produce uniquely named traces per rank.
+Place `profiler.step()` exactly once per logical training step and configure an
+explicit schedule that emits active `ProfilerStep#N` markers. If the profiler
+wrapper cannot guarantee those markers, use the outer `train_step` range as the
+explicit boundary. Warm the model, compiler, dataloader, and allocator before
+the active trace window. In distributed runs, produce uniquely named traces per
+rank.
+
+Capture the same logical steps for eager and compiled variants. Validate both raw
+traces with `scripts/validate_trace_annotations.py` before HTA. Read
+`references/annotation-health.md` for duplicate projected annotations,
+inconsistent interval ends, compile-warning handling, recapture rules, and the
+bounded reconstruction fallback. Record `annotation-health-eager.json` and
+`annotation-health-compiled.json` separately.
+
+Run `TORCH_LOGS=graph_breaks,recompiles` only in a separate bounded compiled
+diagnostic, normalize it with `scripts/analyze_compile_logs.py`, and never use
+its wall time as benchmark evidence.
 
 ## Evidence contract
 
@@ -134,6 +189,9 @@ Run NCU only when all are true:
 2. Kernel-level mechanism changes the next recommendation.
 3. A bounded warm iteration or NVTX range can be selected.
 4. The profiling budget permits replay.
+5. The exact print-only command has separate, fingerprint-bound user approval.
+6. `ncu` is available on the target system; `doctor` alone is not proof that a
+   real capture is permitted.
 
 Useful NCU classifications include memory-bandwidth limitation, low occupancy,
 latency/dependency limitation, poor tensor-core utilization, excessive global
@@ -143,15 +201,17 @@ shape.
 Avoid broad `--set full` captures over complete training runs. Preserve the
 report version, command filters, replay mode, and `.ncu-rep` file.
 
-Use `scripts/ncu_profile.py` for the target check, capture plan, execution,
-summary, and artifact validation. Read `references/ncu-profiling.md` before
+Use `scripts/ncu_profile.py` for the target check, capture plan, explicit
+approval binding, execution, summary, and artifact validation. Read `references/ncu-profiling.md` before
 running the capture.
 
 ## Report contract
 
 Write the report from `assets/report-template.md`. Preserve these distinctions:
 
-- Baseline wall time comes from unprofiled runs.
+- Baseline wall time and compile speedup come from paired unprofiled steady-state
+  runs.
+- Cold compilation, compiler-log runs, and profiler runs are reported separately.
 - Phase/kernel timing comes from profiler evidence.
 - NCU explains selected kernels but does not establish end-to-end speed.
 - Phase-1 opportunities are hypotheses, not measured improvements.

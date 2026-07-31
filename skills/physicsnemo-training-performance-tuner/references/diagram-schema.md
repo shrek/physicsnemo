@@ -4,11 +4,12 @@ Generate diagrams from normalized HTA evidence with:
 
 ```bash
 python scripts/render_trace_diagrams.py \
-  --input <bundle>/hta/diagram-data.json \
-  --output-dir <bundle>/hta/diagrams
+  --input <bundle>/hta/<variant>/diagram-data.json \
+  --output-dir <bundle>/hta/<variant>/diagrams
 ```
 
-The renderer uses only Python's standard library and emits self-contained SVG.
+Run the renderer once for `eager` and once for `compiled`. The renderer uses only
+Python's standard library and emits self-contained SVG.
 Do not hand-enter timings inferred from screenshots. Every span must come from
 the selected trace and use milliseconds relative to its declared boundary.
 

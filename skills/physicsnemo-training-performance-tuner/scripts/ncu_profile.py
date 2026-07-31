@@ -267,6 +267,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "checked_at_utc": utc_now(),
         "ncu": {"path": ncu, "available": ncu is not None},
         "gpu": {"nvidia_smi": shutil.which("nvidia-smi")},
+        "capture_permission_verified": False,
+        "user_capture_approval": False,
         "status": "unavailable",
     }
     if ncu:
@@ -335,17 +337,51 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_approve(args: argparse.Namespace) -> int:
+    spec = read_json(args.spec)
+    errors = validate_spec(spec)
+    if errors:
+        raise UserError("; ".join(errors))
+    output = args.output or args.spec.with_name("capture-approval.json")
+    approval = {
+        "schema_version": SCHEMA_VERSION,
+        "status": "approved",
+        "spec": str(args.spec),
+        "spec_sha256": sha256_file(args.spec),
+        "confirmed_at_utc": utc_now(),
+        "confirmation_source": args.confirmation_source,
+    }
+    write_json(output, approval)
+    print(output)
+    return 0
+
+
+def require_capture_approval(spec_path: Path, approval_path: Path) -> dict[str, Any]:
+    if not approval_path.is_file():
+        raise UserError(
+            "capture approval is missing; show the exact capture --print-only output "
+            "to the user, then record explicit confirmation with the approve command"
+        )
+    approval = read_json(approval_path)
+    if not isinstance(approval, dict) or approval.get("status") != "approved":
+        raise UserError("capture approval status must be 'approved'")
+    if approval.get("spec_sha256") != sha256_file(spec_path):
+        raise UserError(
+            "capture spec changed after approval; show the new print-only plan and "
+            "obtain confirmation again"
+        )
+    if not approval.get("confirmation_source"):
+        raise UserError("capture approval must record a confirmation_source")
+    return approval
+
+
 def cmd_capture(args: argparse.Namespace) -> int:
     spec = read_json(args.spec)
     errors = validate_spec(spec)
     if errors:
         raise UserError("; ".join(errors))
     ncu = resolve_ncu(args.ncu)
-    if not ncu:
-        raise UserError(
-            "ncu was not found; install Nsight Compute or pass --ncu /path/to/ncu"
-        )
-    command = build_ncu_command(ncu, spec)
+    command = build_ncu_command(ncu or args.ncu or "ncu", spec)
     manifest_path = args.manifest or args.spec.with_name("capture-manifest.json")
     report_path = Path(spec["output"]["prefix"] + ".ncu-rep")
     if report_path.exists() and not spec["output"].get("force_overwrite"):
@@ -354,8 +390,25 @@ def cmd_capture(args: argparse.Namespace) -> int:
             "plan with --force-overwrite"
         )
     if args.print_only:
-        print(json.dumps({"argv": command, "cwd": spec["workload"].get("cwd")}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "argv": command,
+                    "cwd": spec["workload"].get("cwd"),
+                    "ncu_available": ncu is not None,
+                    "approval_required_before_capture": True,
+                },
+                indent=2,
+            )
+        )
         return 0
+    if not ncu:
+        raise UserError(
+            "ncu was not found; record NCU as unavailable and skip capture unless the "
+            "user explicitly authorizes a separate installation or platform change"
+        )
+    approval_path = args.approval or args.spec.with_name("capture-approval.json")
+    approval = require_capture_approval(args.spec, approval_path)
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     started = utc_now()
@@ -377,6 +430,8 @@ def cmd_capture(args: argparse.Namespace) -> int:
             "started_at_utc": started,
             "finished_at_utc": utc_now(),
             "spec": str(args.spec),
+            "approval": str(approval_path),
+            "approval_spec_sha256": approval["spec_sha256"],
             "argv": command,
             "cwd": spec["workload"].get("cwd"),
             "returncode": result.returncode,
@@ -399,6 +454,8 @@ def cmd_capture(args: argparse.Namespace) -> int:
             "started_at_utc": started,
             "finished_at_utc": utc_now(),
             "spec": str(args.spec),
+            "approval": str(approval_path),
+            "approval_spec_sha256": approval["spec_sha256"],
             "argv": command,
             "cwd": spec["workload"].get("cwd"),
             "returncode": None,
@@ -480,6 +537,14 @@ def cmd_validate(args: argparse.Namespace) -> int:
     if args.spec:
         spec = read_json(args.spec)
         errors.extend(f"spec: {item}" for item in validate_spec(spec))
+    if args.approval:
+        if not args.spec:
+            errors.append("--approval requires --spec")
+        else:
+            try:
+                require_capture_approval(args.spec, args.approval)
+            except UserError as exc:
+                errors.append(f"approval: {exc}")
     if args.report and not args.report.is_file():
         errors.append(f"report does not exist: {args.report}")
     if args.summary:
@@ -494,8 +559,10 @@ def cmd_validate(args: argparse.Namespace) -> int:
                 errors.append(
                     f"summary schema_version must equal {SCHEMA_VERSION!r}"
                 )
-    if not any((args.spec, args.report, args.summary)):
-        errors.append("provide at least one of --spec, --report, or --summary")
+    if not any((args.spec, args.approval, args.report, args.summary)):
+        errors.append(
+            "provide at least one of --spec, --approval, --report, or --summary"
+        )
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
@@ -533,10 +600,19 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--force-overwrite", action="store_true")
     plan.set_defaults(func=cmd_plan)
 
+    approve = subparsers.add_parser(
+        "approve", help="Bind explicit user confirmation to a capture spec."
+    )
+    approve.add_argument("spec", type=Path)
+    approve.add_argument("--output", type=Path)
+    approve.add_argument("--confirmation-source", required=True)
+    approve.set_defaults(func=cmd_approve)
+
     capture = subparsers.add_parser("capture", help="Run a capture from a spec.")
     capture.add_argument("spec", type=Path)
     capture.add_argument("--ncu")
     capture.add_argument("--manifest", type=Path)
+    capture.add_argument("--approval", type=Path)
     capture.add_argument("--timeout", type=int, default=1800)
     capture.add_argument("--print-only", action="store_true")
     capture.set_defaults(func=cmd_capture)
@@ -553,6 +629,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate = subparsers.add_parser("validate", help="Validate NCU artifacts.")
     validate.add_argument("--spec", type=Path)
+    validate.add_argument("--approval", type=Path)
     validate.add_argument("--report", type=Path)
     validate.add_argument("--summary", type=Path)
     validate.set_defaults(func=cmd_validate)
