@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="285" viewBox="0 0 1400 285">
+<style>
+text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:25px;font-weight:700}.subtitle{font-size:14px;fill:#42526b}.label{font-size:14px}.small{font-size:12px}.lane{font-size:17px;font-weight:700}.grid{stroke:#dce3ec;stroke-width:1}.axis{stroke:#53657a;stroke-width:1.2}
+</style>
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="28" y="38" class="title">In-step GPU idle bubbles</text>
+<text x="28" y="64" class="subtitle">Red spans are explicitly classified bubbles; grey spans are unclassified idle time.</text>
+<line x1="180.0" y1="90" x2="180.0" y2="215" class="grid"/>
+<text x="180.0" y="237" text-anchor="middle" class="small">0.0</text>
+<line x1="388.0" y1="90" x2="388.0" y2="215" class="grid"/>
+<text x="388.0" y="237" text-anchor="middle" class="small">160.9</text>
+<line x1="596.0" y1="90" x2="596.0" y2="215" class="grid"/>
+<text x="596.0" y="237" text-anchor="middle" class="small">321.8</text>
+<line x1="804.0" y1="90" x2="804.0" y2="215" class="grid"/>
+<text x="804.0" y="237" text-anchor="middle" class="small">482.6</text>
+<line x1="1012.0" y1="90" x2="1012.0" y2="215" class="grid"/>
+<text x="1012.0" y="237" text-anchor="middle" class="small">643.5</text>
+<line x1="1220.0" y1="90" x2="1220.0" y2="215" class="grid"/>
+<text x="1220.0" y="237" text-anchor="middle" class="small">804.4</text>
+<text x="162" y="145" text-anchor="end" class="lane">GPU</text>
+<rect x="180" y="112" width="1040" height="52" fill="#59a14f" fill-opacity="0.2" stroke="#8fa0b5"/>
+<rect x="180.0" y="112" width="550.5" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="455.2" y="185" text-anchor="middle" class="small">GPU idle · 425.8 ms</text>
+<rect x="775.7" y="112" width="2.4" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="776.9" y="185" text-anchor="middle" class="small">GPU idle · 1.9 ms</text>
+<rect x="1061.1" y="112" width="2.0" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1062.1" y="185" text-anchor="middle" class="small">GPU idle · 1.0 ms</text>
+<rect x="1217.6" y="112" width="2.4" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="1218.8" y="185" text-anchor="middle" class="small">GPU idle · 1.9 ms</text>
+<text x="180" y="248" class="subtitle">Total classified idle: 430.6 ms (53.5% of step).</text>
+</svg>

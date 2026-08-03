@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="380" viewBox="0 0 1400 380">
+<style>
+text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:25px;font-weight:700}.subtitle{font-size:14px;fill:#42526b}.label{font-size:14px}.small{font-size:12px}.lane{font-size:17px;font-weight:700}.grid{stroke:#dce3ec;stroke-width:1}.axis{stroke:#53657a;stroke-width:1.2}
+</style>
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="28" y="38" class="title">GeoTransolver volume eager: CPU/GPU pipeline</text>
+<text x="28" y="65" class="subtitle">Step ProfilerStep#7 · 1059.7 ms · grey/red regions identify GPU idle bubbles</text>
+<line x1="180.0" y1="85" x2="180.0" y2="325" class="grid"/>
+<text x="180.0" y="347" text-anchor="middle" class="small">0.0</text>
+<line x1="388.0" y1="85" x2="388.0" y2="325" class="grid"/>
+<text x="388.0" y="347" text-anchor="middle" class="small">211.9</text>
+<line x1="596.0" y1="85" x2="596.0" y2="325" class="grid"/>
+<text x="596.0" y="347" text-anchor="middle" class="small">423.9</text>
+<line x1="804.0" y1="85" x2="804.0" y2="325" class="grid"/>
+<text x="804.0" y="347" text-anchor="middle" class="small">635.8</text>
+<line x1="1012.0" y1="85" x2="1012.0" y2="325" class="grid"/>
+<text x="1012.0" y="347" text-anchor="middle" class="small">847.7</text>
+<line x1="1220.0" y1="85" x2="1220.0" y2="325" class="grid"/>
+<text x="1220.0" y="347" text-anchor="middle" class="small">1059.7</text>
+<text x="162" y="136" text-anchor="end" class="lane">CPU</text>
+<rect x="180" y="105" width="1040" height="52" fill="#eef2f7" stroke="#8fa0b5"/>
+<rect x="180.0" y="105" width="383.0" height="52" fill="#4e79a7" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="371.5" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">dataloader_wait</text>
+<text x="371.5" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">390.2 ms</text>
+<rect x="563.0" y="105" width="1.5" height="52" fill="#76b7b2" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="563.1" y="105" width="186.3" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="656.3" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">forward</text>
+<text x="656.3" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">189.9 ms</text>
+<rect x="749.5" y="105" width="78.7" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="788.8" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">loss</text>
+<text x="788.8" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">80.2 ms</text>
+<rect x="829.2" y="105" width="214.6" height="52" fill="#af7aa1" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="936.5" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">backward</text>
+<text x="936.5" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">218.6 ms</text>
+<rect x="1043.8" y="105" width="139.1" height="52" fill="#f28e2b" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="1113.4" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">optimizer_step</text>
+<text x="1113.4" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">141.8 ms</text>
+<rect x="1183.7" y="105" width="32.8" height="52" fill="#edc948" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="162" y="251" text-anchor="end" class="lane">GPU</text>
+<rect x="180" y="220" width="1040" height="52" fill="#eef2f7" stroke="#8fa0b5"/>
+<rect x="180.0" y="220" width="347.6" height="52" fill="#e15759" fill-opacity="0.75" stroke="#ffffff"/>
+<text x="353.8" y="243" text-anchor="middle" class="small" fill="#172033" style="fill:#172033">GPU idle</text>
+<text x="353.8" y="260" text-anchor="middle" class="small" fill="#172033" style="fill:#172033">354.2 ms</text>
+<text x="353.8" y="295" text-anchor="middle" class="small">No GPU kernel on the captured stream</text>
+<rect x="527.6" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="527.9" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="528.4" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="528.7" y="220" width="1.9" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="530.9" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="531.9" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="532.9" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="533.3" y="220" width="12.9" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="546.5" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="547.8" y="220" width="14.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="562.6" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="562.8" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="562.9" y="220" width="1.5" height="52" fill="#e15759" fill-opacity="0.75" stroke="#ffffff"/>
+<text x="563.6" y="295" text-anchor="middle" class="small">No GPU kernel on the captured stream</text>
+<rect x="564.2" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="564.7" y="220" width="263.4" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="696.4" y="243" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">GPU kernels</text>
+<text x="696.4" y="260" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">268.4 ms</text>
+<rect x="828.1" y="220" width="2.3" height="52" fill="#e15759" fill-opacity="0.75" stroke="#ffffff"/>
+<text x="829.3" y="295" text-anchor="middle" class="small">No GPU kernel on the captured stream</text>
+<rect x="830.5" y="220" width="1.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="830.5" y="220" width="1.5" height="52" fill="#e15759" fill-opacity="0.75" stroke="#ffffff"/>
+<text x="831.2" y="295" text-anchor="middle" class="small">No GPU kernel on the captured stream</text>
+<rect x="831.6" y="220" width="384.6" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="1023.9" y="243" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">GPU kernels</text>
+<text x="1023.9" y="260" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">391.8 ms</text>
+<rect x="1216.2" y="220" width="3.8" height="52" fill="#e15759" fill-opacity="0.75" stroke="#ffffff"/>
+<text x="1218.1" y="295" text-anchor="middle" class="small">No GPU kernel on the captured stream</text>
+<text x="180" y="366" class="subtitle">HTA GPU compute=64.88%, idle=34.98% over the five captured steps.</text>
+</svg>

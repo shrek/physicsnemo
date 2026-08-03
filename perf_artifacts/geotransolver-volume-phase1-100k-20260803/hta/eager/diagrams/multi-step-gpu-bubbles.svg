@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="330" viewBox="0 0 1400 330">
+<style>
+text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:25px;font-weight:700}.subtitle{font-size:14px;fill:#42526b}.label{font-size:14px}.small{font-size:12px}.lane{font-size:17px;font-weight:700}.grid{stroke:#dce3ec;stroke-width:1}.axis{stroke:#53657a;stroke-width:1.2}
+</style>
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="28" y="38" class="title">GeoTransolver volume eager: GPU compute and dataload bubbles</text>
+<text x="28" y="64" class="subtitle">GPU busy envelopes across consecutive steps; red gaps expose inter-step pipeline starvation.</text>
+<line x1="180.0" y1="90" x2="180.0" y2="250" class="grid"/>
+<text x="180.0" y="272" text-anchor="middle" class="small">0.0</text>
+<line x1="388.0" y1="90" x2="388.0" y2="250" class="grid"/>
+<text x="388.0" y="272" text-anchor="middle" class="small">1100.5</text>
+<line x1="596.0" y1="90" x2="596.0" y2="250" class="grid"/>
+<text x="596.0" y="272" text-anchor="middle" class="small">2201.0</text>
+<line x1="804.0" y1="90" x2="804.0" y2="250" class="grid"/>
+<text x="804.0" y="272" text-anchor="middle" class="small">3301.5</text>
+<line x1="1012.0" y1="90" x2="1012.0" y2="250" class="grid"/>
+<text x="1012.0" y="272" text-anchor="middle" class="small">4401.9</text>
+<line x1="1220.0" y1="90" x2="1220.0" y2="250" class="grid"/>
+<text x="1220.0" y="272" text-anchor="middle" class="small">5502.4</text>
+<text x="162" y="145" text-anchor="end" class="lane">GPU</text>
+<rect x="180" y="112" width="1040" height="52" fill="#e6ebf2" stroke="#8fa0b5"/>
+<rect x="254.2" y="112" width="135.9" height="52" fill="#59a14f" stroke="#ffffff"/>
+<text x="322.1" y="143" text-anchor="middle" class="small" style="fill:#ffffff">ProfilerStep#5</text>
+<rect x="390.1" y="112" width="73.0" height="52" fill="#e15759" fill-opacity="0.9"/>
+<text x="426.6" y="143" text-anchor="middle" class="small" style="fill:#ffffff">bubble 386.3 ms</text>
+<rect x="463.1" y="112" width="133.4" height="52" fill="#59a14f" stroke="#ffffff"/>
+<text x="529.8" y="143" text-anchor="middle" class="small" style="fill:#ffffff">ProfilerStep#6</text>
+<rect x="596.5" y="112" width="67.4" height="52" fill="#e15759" fill-opacity="0.9"/>
+<text x="630.2" y="143" text-anchor="middle" class="small" style="fill:#ffffff">bubble 356.7 ms</text>
+<rect x="663.9" y="112" width="132.6" height="52" fill="#59a14f" stroke="#ffffff"/>
+<text x="730.2" y="143" text-anchor="middle" class="small" style="fill:#ffffff">ProfilerStep#7</text>
+<rect x="796.5" y="112" width="76.8" height="52" fill="#e15759" fill-opacity="0.9"/>
+<text x="834.9" y="143" text-anchor="middle" class="small" style="fill:#ffffff">bubble 406.4 ms</text>
+<rect x="873.3" y="112" width="132.5" height="52" fill="#59a14f" stroke="#ffffff"/>
+<text x="939.6" y="143" text-anchor="middle" class="small" style="fill:#ffffff">ProfilerStep#8</text>
+<rect x="1005.8" y="112" width="80.3" height="52" fill="#e15759" fill-opacity="0.9"/>
+<text x="1046.0" y="143" text-anchor="middle" class="small" style="fill:#ffffff">bubble 424.8 ms</text>
+<rect x="1086.1" y="112" width="133.5" height="52" fill="#59a14f" stroke="#ffffff"/>
+<text x="1152.9" y="143" text-anchor="middle" class="small" style="fill:#ffffff">ProfilerStep#9</text>
+<text x="180" y="222" class="subtitle">Observed window: 5502.4 ms · GPU busy: 3533.9 ms · inter-step bubbles: 1574.2 ms.</text>
+</svg>

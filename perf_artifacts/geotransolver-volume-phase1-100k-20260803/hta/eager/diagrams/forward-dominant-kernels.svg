@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="475" viewBox="0 0 1400 475">
+<style>
+text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:25px;font-weight:700}.subtitle{font-size:14px;fill:#42526b}.label{font-size:14px}.small{font-size:12px}.lane{font-size:17px;font-weight:700}.grid{stroke:#dce3ec;stroke-width:1}.axis{stroke:#53657a;stroke-width:1.2}
+</style>
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<text x="28" y="38" class="title">GeoTransolver volume eager: forward dominant kernel families</text>
+<text x="28" y="64" class="subtitle">Kernel families are ordered by total GPU time; the CPU forward span provides the wall-time boundary.</text>
+<rect x="18" y="74" width="1364" height="307" rx="8" fill="#ffffff" stroke="#d8e0ea"/>
+<text x="35" y="100" class="lane">ProfilerStep#7</text>
+<line x1="180.0" y1="122" x2="180.0" y2="332" class="grid"/>
+<text x="180.0" y="354" text-anchor="middle" class="small">0.0</text>
+<line x1="388.0" y1="122" x2="388.0" y2="332" class="grid"/>
+<text x="388.0" y="354" text-anchor="middle" class="small">52.4</text>
+<line x1="596.0" y1="122" x2="596.0" y2="332" class="grid"/>
+<text x="596.0" y="354" text-anchor="middle" class="small">104.9</text>
+<line x1="804.0" y1="122" x2="804.0" y2="332" class="grid"/>
+<text x="804.0" y="354" text-anchor="middle" class="small">157.3</text>
+<line x1="1012.0" y1="122" x2="1012.0" y2="332" class="grid"/>
+<text x="1012.0" y="354" text-anchor="middle" class="small">209.8</text>
+<line x1="1220.0" y1="122" x2="1220.0" y2="332" class="grid"/>
+<text x="1220.0" y="354" text-anchor="middle" class="small">262.2</text>
+<text x="168" y="142" text-anchor="end" class="label">CPU forward</text>
+<rect x="180" y="126" width="1040" height="20" rx="3" fill="#cfd8e6" stroke="#9aabc0"/>
+<text x="168" y="171" text-anchor="end" class="label">radius_search</text>
+<rect x="180.0" y="156" width="601.7" height="20" rx="2" fill="#c94c16"><title>radius_search: 151.700 ms</title></rect>
+<text x="480.9" y="170" text-anchor="middle" class="small" style="fill:#ffffff">151.7</text>
+<text x="1232" y="171" class="small">151.70 ms (1)</text>
+<text x="168" y="201" text-anchor="end" class="label">other</text>
+<rect x="781.7" y="186" width="161.4" height="20" rx="2" fill="#94a3b8"><title>other: 40.701 ms</title></rect>
+<text x="862.4" y="200" text-anchor="middle" class="small" style="fill:#ffffff">40.7</text>
+<text x="1232" y="201" class="small">40.70 ms (1)</text>
+<text x="168" y="231" text-anchor="end" class="label">memory</text>
+<rect x="943.1" y="216" width="144.8" height="20" rx="2" fill="#66788a"><title>memory: 36.505 ms</title></rect>
+<text x="1015.5" y="230" text-anchor="middle" class="small" style="fill:#ffffff">36.5</text>
+<text x="1232" y="231" class="small">36.50 ms (1)</text>
+<text x="168" y="261" text-anchor="end" class="label">attention</text>
+<rect x="1087.9" y="246" width="119.0" height="20" rx="2" fill="#7b35de"><title>attention: 29.995 ms</title></rect>
+<text x="1147.4" y="260" text-anchor="middle" class="small" style="fill:#ffffff">30.0</text>
+<text x="1232" y="261" class="small">30.00 ms (1)</text>
+<text x="168" y="291" text-anchor="end" class="label">reduction</text>
+<rect x="1206.9" y="276" width="12.0" height="20" rx="2" fill="#cc8500"><title>reduction: 3.020 ms</title></rect>
+<text x="1232" y="291" class="small">3.02 ms (1)</text>
+<text x="168" y="321" text-anchor="end" class="label">gemm</text>
+<rect x="1218.9" y="306" width="1.2" height="20" rx="2" fill="#2f62e8"><title>gemm: 0.281 ms</title></rect>
+<text x="1232" y="321" class="small">0.28 ms (1)</text>
+</svg>

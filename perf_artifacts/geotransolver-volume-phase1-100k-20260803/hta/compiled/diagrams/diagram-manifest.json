@@ -1,0 +1,10 @@
+{
+  "input": "/tmp/physicsnemo-performance/geotransolver-volume-phase1-20260803-traces-v2/hta/compiled/diagram-data.json",
+  "outputs": {
+    "cpu_gpu_pipeline": "/tmp/physicsnemo-performance/geotransolver-volume-phase1-20260803-traces-v2/hta/compiled/diagrams/cpu-gpu-pipeline.svg",
+    "forward_dominant_kernels": "/tmp/physicsnemo-performance/geotransolver-volume-phase1-20260803-traces-v2/hta/compiled/diagrams/forward-dominant-kernels.svg",
+    "in_step_gpu_bubbles": "/tmp/physicsnemo-performance/geotransolver-volume-phase1-20260803-traces-v2/hta/compiled/diagrams/in-step-gpu-bubbles.svg",
+    "multi_step_gpu_bubbles": "/tmp/physicsnemo-performance/geotransolver-volume-phase1-20260803-traces-v2/hta/compiled/diagrams/multi-step-gpu-bubbles.svg"
+  },
+  "schema_version": "0.1"
+}
