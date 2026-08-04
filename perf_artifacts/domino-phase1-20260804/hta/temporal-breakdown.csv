@@ -1,0 +1,2 @@
+rank,idle_time(us),compute_time(us),non_compute_time(us),kernel_time(us),idle_time_pctg,compute_time_pctg,non_compute_time_pctg
+0,57223451.0,30224093.0,580802.0,88028346.0,65.01,34.33,0.66

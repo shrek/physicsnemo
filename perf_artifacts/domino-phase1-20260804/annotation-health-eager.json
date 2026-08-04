@@ -1,0 +1,51 @@
+{
+  "annotations": {
+    "compile_record_function_warning": false,
+    "duplicate_projected_annotations": true,
+    "missing_required_phases": [],
+    "original_annotation_count": 266,
+    "phase_counts": {
+      "backward": 38,
+      "forward": 38,
+      "loss": 38,
+      "optimizer_step": 38
+    },
+    "projected_annotation_count": 229,
+    "required_phases": [
+      "forward",
+      "loss",
+      "backward",
+      "optimizer_step"
+    ]
+  },
+  "kernel_attribution": {
+    "fallback_used": false,
+    "method": "hta_user_annotation"
+  },
+  "notes": [
+    "Projected gpu_user_annotation rows were detected; exclude them from CPU phase interval construction to avoid duplicates."
+  ],
+  "phase": 1,
+  "recapture": {
+    "reason": null,
+    "required": false
+  },
+  "run_id": "domino-eager-20260804",
+  "schema_version": "0.1",
+  "status": "pass",
+  "step_boundary": {
+    "count": 38,
+    "marker": "train_step",
+    "provenance": "explicit_train_step",
+    "selection_rule": null
+  },
+  "timestamps": {
+    "derived_end_required": false,
+    "duration_invalid_count": 0,
+    "end_before_start_count": 0,
+    "end_field_inconsistent_count": 0,
+    "end_rule": "Use valid HTA end only when consistent; otherwise ts + dur."
+  },
+  "trace": "/workspace/physicsnemo/examples/cfd/external_aerodynamics/domino/src/physicsnemo_profiling_outputs/torch/trace.json",
+  "variant": "eager"
+}

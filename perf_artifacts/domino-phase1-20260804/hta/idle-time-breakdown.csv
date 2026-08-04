@@ -1,0 +1,14 @@
+rank,stream,idle_category,idle_time,idle_time_ratio
+0,7,host_wait,61629576.0,0.99
+0,7,kernel_wait,434530.0,0.01
+0,7,other,6574.0,0.0
+0,142,host_wait,82015532.0,1.0
+0,142,kernel_wait,7211.0,0.0
+0,142,other,65.0,0.0
+0,143,host_wait,12.0,1.0
+0,143,other,0.0,0.0
+0,159,host_wait,12.0,1.0
+0,159,other,0.0,0.0
+0,13,host_wait,86375662.0,1.0
+0,13,kernel_wait,816.0,0.0
+0,13,other,0.0,0.0

@@ -1,0 +1,20 @@
+name,sum (us),max (us),min (us),stddev,mean (us),kernel_type,rank
+_bvh_query_distance_cea85735_cuda_kernel_forward,2222091.0,2222091.0,2222091.0,0.0,2222091.0,COMPUTATION,0
+nvjet_sm90_hsh_128x256_64x4_2x1_v_bz_coopA_bias_TNN,214813.0,214813.0,214813.0,0.0,214813.0,COMPUTATION,0
+others,2476626.0,176379.0,1.0,27056.41807249174,11360.669724770642,COMPUTATION,0
+radius_search_limited_select_batched_2985e173_cuda_kernel_forward,19699564.0,19699564.0,19699564.0,0.0,19699564.0,COMPUTATION,0
+sm80_xmma_dgrad_implicit_gemm_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize256x32x32_stage4_warpsize4x1x1_g1_tensor16x8x16_execute_kernel__5x_cudnn,200929.0,200929.0,200929.0,0.0,200929.0,COMPUTATION,0
+sm80_xmma_wgrad_implicit_gemm_indexed_wo_smem_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize32x32x64_stage1_warpsize2x2x1_g1_tensor16x8x16_aligna2_alignc2_execute_kernel__5x_cudnn,243499.0,243499.0,243499.0,0.0,243499.0,COMPUTATION,0
+"void at::native::mbtopk::fill<unsigned int, unsigned int>(unsigned int*, unsigned int, unsigned int)",-5.0,-5.0,-5.0,0.0,-5.0,COMPUTATION,0
+"void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::Half, at::native::func_wrapper_t<c10::Half, at::native::sum_functor<c10::Half, float, c10::Half>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::Half, 4, 8> >(at::native::ReduceOp<c10::Half, at::native::func_wrapper_t<c10::Half, at::native::sum_functor<c10::Half, float, c10::Half>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::Half, 4, 8>)",361741.0,361741.0,361741.0,0.0,361741.0,COMPUTATION,0
+"void at::native::vectorized_elementwise_kernel<8, at::native::GeluBackwardCUDAKernelImpl(at::TensorIteratorBase&, at::native::GeluType)::{lambda()#2}::operator()() const::{lambda()#3}::operator()() const::{lambda(c10::Half, c10::Half)#1}, std::array<char*, 3ul> >(int, at::native::GeluBackwardCUDAKernelImpl(at::TensorIteratorBase&, at::native::GeluType)::{lambda()#2}::operator()() const::{lambda()#3}::operator()() const::{lambda(c10::Half, c10::Half)#1}, std::array<char*, 3ul>)",191800.0,191800.0,191800.0,0.0,191800.0,COMPUTATION,0
+"void at::native::vectorized_gather_kernel<16, long>(char*, char*, long*, int, long, long, long, long, bool)",386081.0,386081.0,386081.0,0.0,386081.0,COMPUTATION,0
+"void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceScanInitKernel<cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::ScanTileState<float, true> >(cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::ScanTileState<float, true>, int)",-1.0,-1.0,-1.0,0.0,-1.0,COMPUTATION,0
+"void cuvs::neighbors::ball_cover::detail::compute_final_dists_registers<long, float, unsigned int, unsigned int, 32, 2, 128>(float const*, float const*, long, unsigned int*, unsigned int, float const*, long const*, long const*, float const*, long*, float*, long, long, cuvs::distance::DistanceType)",368451.0,368451.0,368451.0,0.0,368451.0,COMPUTATION,0
+"void cuvs::neighbors::detail::fusedL2kNN<float, float, long, raft::linalg::KernelPolicy<float, 1, 16, 2, 8, 8, 32>, cuvs::distance::detail::ops::l2_exp_distance_op<float, float, long>, raft::identity_op, 32, 2, false, true>(float const*, float const*, float const*, float const*, long, long, long, long, long, long, cuvs::distance::detail::ops::l2_exp_distance_op<float, float, long>, raft::identity_op, unsigned int, int volatile*, float volatile*, long volatile*)",3858513.0,3858513.0,3858513.0,0.0,3858513.0,COMPUTATION,0
+"wp::memset_kernel(int*, int, unsigned long)",-9.0,-9.0,-9.0,0.0,-9.0,COMPUTATION,0
+Memcpy DtoD (Device -> Device),4825.0,13.0,-1.0,1.6614906188635064,0.9405458089668616,MEMORY,0
+Memcpy DtoH (Device -> Pinned),697.0,4.0,0.0,0.4869994893754806,1.0789473684210527,MEMORY,0
+Memcpy HtoD (Pageable -> Device),-441.0,2.0,-1.0,0.44174186719819963,-0.2149122807017544,MEMORY,0
+Memcpy HtoD (Pinned -> Device),587162.0,5679.0,110.0,1732.5610216168106,1545.1631578947367,MEMORY,0
+Memset (Device),3725.0,9.0,-1.0,0.9401965882277115,0.09194806477093206,MEMORY,0
