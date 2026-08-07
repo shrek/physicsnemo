@@ -22,6 +22,7 @@ from physicsnemo.core.function_spec import FunctionSpec
 from ._compact_cell_points_impl import (
     radius_search as radius_search_compact_cell_points,
 )
+from ._physicsnemo_ops_impl import radius_search as radius_search_physicsnemo_ops
 from ._torch_impl import radius_search as radius_search_torch
 from ._warp_impl import radius_search as radius_search_warp
 
@@ -75,8 +76,8 @@ class RadiusSearch(FunctionSpec):
         return_points (bool, optional): If True, returns the actual neighbor points in addition to
             their indices. Defaults to False.
         implementation (str, optional): Explicit implementation name ("warp", "torch",
-            or experimental "compact_cell_points"). Defaults to None, which selects
-            by rank.
+            "compact_cell_points", or "physicsnemo_ops"). Defaults to None,
+            which selects by rank.
 
     Returns:
         tuple | torch.Tensor:
@@ -147,6 +148,29 @@ class RadiusSearch(FunctionSpec):
         """Experimental CUDA radius search using compact cell-grouped points."""
         return radius_search_compact_cell_points(
             points, queries, radius, max_points, return_dists, return_points
+        )
+
+    @FunctionSpec.register(
+        name="physicsnemo_ops",
+        required_imports=("physicsnemo-ops>=0.1.dev0",),
+        rank=3,
+    )
+    def physicsnemo_ops_forward(
+        points: Float[torch.Tensor, "*batch num_points 3"],
+        queries: Float[torch.Tensor, "*batch num_queries 3"],
+        radius: float,
+        max_points: int | None = None,
+        return_dists: bool = False,
+        return_points: bool = False,
+    ) -> tuple[torch.Tensor, ...]:
+        """Packaged compact-cell radius search from physicsnemo-ops."""
+        return radius_search_physicsnemo_ops(
+            points,
+            queries,
+            radius,
+            max_points,
+            return_dists,
+            return_points,
         )
 
     @classmethod

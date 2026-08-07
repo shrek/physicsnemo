@@ -532,6 +532,16 @@ Canonical CLI invocations for every named recipe the recipe ships with:
 # Default (GeoTransolver + DrivAerML volume)
 python src/train.py
 
+# GeoTransolver volume with the in-tree CuPy compact-cell radius search
+python src/train.py model=geotransolver_volume dataset=drivaer_ml_volume \
+    model.radius_search_implementation=compact_cell_points
+
+# GeoTransolver volume with the packaged physicsnemo-ops compact-cell kernel
+# (from the PhysicsNeMo repo root, install the sibling checkout first:
+#  uv pip install --python .venv/bin/python -e ../physicsnemo-ops)
+python src/train.py model=geotransolver_volume dataset=drivaer_ml_volume \
+    model.radius_search_implementation=physicsnemo_ops
+
 # GeoTransolver, DrivAerML surface (the original recipe disabled torch.compile)
 python src/train.py model=geotransolver_surface dataset=drivaer_ml_surface \
     compile=false
