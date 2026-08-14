@@ -8,7 +8,7 @@ from nooa.unifiedllm import FakeLLMClient
 from simplified.agents import (
     Agents,
     CandidateCritic,
-    InputCritic,
+    InputContractCritic,
     ReportBuilder,
     Router,
     TraceCritic,
@@ -48,6 +48,11 @@ class Proposer:
         return next(self.values)
 
 
+class InputReviews:
+    async def review(self, spec):
+        return Critique(accepted=True)
+
+
 class Analyzer:
     def __init__(self, analysis):
         self.analysis = analysis
@@ -70,17 +75,19 @@ class Runner:
     def __init__(self, traces, candidates):
         self.traces = iter(traces)
         self.candidates = iter(candidates)
+        self.smoke_calls = 0
 
     def smoke(self, spec):
+        self.smoke_calls += 1
         return RunResult(completed=True)
 
-    def benchmark(self, spec):
+    async def benchmark(self, spec):
         return BASELINE
 
     def profile(self, spec, plan):
         return next(self.traces)
 
-    def benchmark_candidate(self, spec, proposal):
+    async def benchmark_candidate(self, spec, proposal):
         return CandidateResult(completed=True, benchmark=next(self.candidates))
 
 
@@ -126,7 +133,8 @@ def test_feedback_drives_revision_until_every_stage_is_accepted():
     )
     agents = Agents(
         inputs=inputs,
-        input_critic=InputCritic(llm=llm),
+        input_contract_critic=InputContractCritic(llm=llm),
+        input_critic=InputReviews(),
         runner=runner,
         instrumentation=instrumentation,
         trace_critic=TraceCritic(llm=llm),
@@ -145,6 +153,7 @@ def test_feedback_drives_revision_until_every_stage_is_accepted():
     )
 
     assert result.speedup == 1.25
+    assert runner.smoke_calls == 1
     assert instrumentation.feedback[1].feedback == (
         "profiler failed; trace path is empty; trace summary is empty; missing ranges: "
         "backward, data_loading, forward, host_to_device, loss, optimizer_step"
@@ -159,7 +168,8 @@ def test_trace_retry_exhaustion_stops_before_analysis():
     failed_trace = TraceResult(completed=False, error="no trace")
     agents = Agents(
         inputs=Proposer([SPEC]),
-        input_critic=InputCritic(llm=llm),
+        input_contract_critic=InputContractCritic(llm=llm),
+        input_critic=InputReviews(),
         runner=Runner([failed_trace], []),
         instrumentation=Proposer([InstrumentationPlan(patch="x", ranges=())]),
         trace_critic=TraceCritic(llm=llm),

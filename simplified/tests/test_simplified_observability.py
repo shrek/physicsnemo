@@ -11,7 +11,7 @@ from simplified.agents import (
     Agents,
     CandidateCritic,
     HotspotAnalyzer,
-    InputCritic,
+    InputContractCritic,
     ReportBuilder,
     Router,
     TraceCritic,
@@ -44,6 +44,11 @@ class InputStub(Agent):
         return SPEC
 
 
+class InputCriticStub(Agent):
+    async def review(self, spec):
+        return Critique(accepted=True)
+
+
 class InstrumentationStub(Agent):
     attempts = 0
 
@@ -65,10 +70,13 @@ class ChangeStub(Agent):
 class RunnerStub(Agent):
     profile_attempts = 0
 
+    def preflight(self, spec):
+        return RunResult(completed=True)
+
     def smoke(self, spec):
         return RunResult(completed=True)
 
-    def benchmark(self, spec):
+    async def benchmark(self, spec):
         return BenchmarkResult(step_time_ms=100, correctness_value=1)
 
     def profile(self, spec, plan):
@@ -82,7 +90,7 @@ class RunnerStub(Agent):
             summary="Dataloader wait is 40% of the step.",
         )
 
-    def benchmark_candidate(self, spec, proposal):
+    async def benchmark_candidate(self, spec, proposal):
         return CandidateResult(
             completed=True,
             benchmark=BenchmarkResult(step_time_ms=80, correctness_value=1),
@@ -97,7 +105,8 @@ def test_optimizer_run_exposes_workflow_nodes_retries_and_generation():
     )
     agents = Agents(
         inputs=InputStub(llm=llm),
-        input_critic=InputCritic(llm=llm),
+        input_contract_critic=InputContractCritic(llm=llm),
+        input_critic=InputCriticStub(llm=llm),
         runner=RunnerStub(llm=llm),
         instrumentation=InstrumentationStub(llm=llm),
         trace_critic=TraceCritic(llm=llm),
@@ -132,6 +141,21 @@ def test_optimizer_run_exposes_workflow_nodes_retries_and_generation():
         and span.attributes.get("agent.name") == "InstrumentationStub"
         for span in spans
     ) == 2
+    assert any(
+        span.name == "method.review"
+        and span.attributes.get("agent.name") == "InputCriticStub"
+        for span in spans
+    )
     assert any(span.name == "generation" for span in spans)
+    assert any(
+        span.name == "method.preflight"
+        and span.attributes.get("agent.name") == "RunnerStub"
+        for span in spans
+    )
+    assert sum(
+        span.name == "method.smoke"
+        and span.attributes.get("agent.name") == "RunnerStub"
+        for span in spans
+    ) == 1
     assert "input.value" in trace_critic.attributes
     assert "output.value" in trace_critic.attributes

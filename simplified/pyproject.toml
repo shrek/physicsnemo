@@ -1,0 +1,33 @@
+[project]
+name = "simplified-training-optimizer"
+version = "0.1.0"
+description = "Minimal NOOA training optimizer"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "nooa",
+    "pydantic>=2",
+]
+
+[project.scripts]
+simplified-step = "simplified.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["simplified"]
+package-dir = { simplified = "." }
+
+[tool.pytest.ini_options]
+markers = ["llm: calls a real external LLM"]
+
+[tool.ruff.lint.per-file-ignores]
+"cli.py" = ["S603", "S607"]
+"tests/*.py" = ["S101", "S603", "S607"]

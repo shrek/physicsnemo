@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from simplified.types import (
+    BenchmarkLog,
     BenchmarkResult,
     CandidateResult,
     ChangeProposal,
@@ -23,8 +24,14 @@ class SourceEnvironment(Protocol):
     def read_file(self, path: str, start_line: int = 1, end_line: int = 200) -> str: ...
 
 
-class TrainingEnvironment(Protocol):
+class InputValidationEnvironment(Protocol):
+    def preflight(self, spec: TrainingSpec) -> RunResult: ...
+
     def smoke(self, spec: TrainingSpec) -> RunResult: ...
+
+
+class TrainingEnvironment(InputValidationEnvironment, Protocol):
+    def benchmark_log(self, spec: TrainingSpec) -> BenchmarkLog: ...
 
     def benchmark(self, spec: TrainingSpec) -> BenchmarkResult: ...
 
@@ -33,3 +40,8 @@ class TrainingEnvironment(Protocol):
     def benchmark_candidate(
         self, spec: TrainingSpec, proposal: ChangeProposal
     ) -> CandidateResult: ...
+
+    def benchmark_candidate_log(
+        self, spec: TrainingSpec, proposal: ChangeProposal
+    ) -> BenchmarkLog:
+        ...

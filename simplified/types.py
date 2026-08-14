@@ -15,7 +15,12 @@ class TrainingRequest(Value):
     description: str = Field(min_length=1)
 
 
+class HelloResponse(Value):
+    message: str = Field(min_length=1)
+
+
 class TrainingSpec(Value):
+    working_directory: str = Field(default=".", min_length=1)
     smoke_command: tuple[str, ...]
     benchmark_command: tuple[str, ...]
     profile_command: tuple[str, ...]
@@ -26,6 +31,7 @@ class TrainingSpec(Value):
 class Critique(Value):
     accepted: bool
     feedback: str = ""
+    requires_human: bool = False
 
 
 class RunResult(Value):
@@ -33,9 +39,22 @@ class RunResult(Value):
     error: str = ""
 
 
+class BenchmarkLog(Value):
+    completed: bool
+    stdout: str = ""
+    stderr: str = ""
+    error: str = ""
+
+
 class BenchmarkResult(Value):
     step_time_ms: float = Field(gt=0)
     correctness_value: float = Field(allow_inf_nan=False)
+    correctness_metric: str = Field(default="correctness_value", min_length=1)
+
+
+class BenchmarkInterpretation(Value):
+    benchmark: BenchmarkResult | None = None
+    error: str = ""
 
 
 class InstrumentationPlan(Value):
