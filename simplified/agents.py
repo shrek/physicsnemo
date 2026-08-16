@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import sys
 import shlex
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Annotated, Literal, Protocol, TextIO
 
 from nooa import Agent, CodeActStrategy, PredictStrategy, hidden, strategy
 from nooa.config.strategy_config import CodeActConfig, PredictConfig
+from nooa.errors import GenerationError
+from nooa.events import Feedback
 from nooa.unifiedllm import UnifiedLLM
+from pydantic import BaseModel
 
 from simplified.environment import (
     InputValidationEnvironment,
@@ -122,6 +127,13 @@ class TerminalHumanGate:
                 file=self.output_stream,
                 flush=True,
             )
+        for overlay in spec.config_overlays:
+            print(
+                f"{'config overlay':>17}: {overlay.path} <- "
+                f"{json.dumps(overlay.merge, sort_keys=True)}",
+                file=self.output_stream,
+                flush=True,
+            )
         print(
             "Press Enter to approve, or type corrections for the LLM:",
             file=self.output_stream,
@@ -183,7 +195,8 @@ class TerminalHumanGate:
 
 
 REQUIRED_RANGES = (
-    "data_loading",
+    "train_step",
+    "dataloader_wait",
     "host_to_device",
     "forward",
     "loss",
@@ -238,6 +251,295 @@ class CompatiblePredictStrategy(PredictStrategy):
         )
 
 
+class _PlainTextPredictStrategy(CompatiblePredictStrategy):
+    """Accept text-only model output without NOOA's JSON decoding step."""
+
+    def _parse_llm_response(self, llm_response, method_name: str) -> dict[str, str]:
+        del method_name
+        value = getattr(llm_response, "content", None)
+        if not value:
+            value = getattr(llm_response, "reasoning", None)
+        if isinstance(value, BaseModel):
+            value = value.model_dump_json()
+        elif not isinstance(value, str):
+            value = json.dumps(value, default=str) if value is not None else ""
+        if not value.strip():
+            raise ValueError("the progress judge returned no text")
+        return {"value": value.strip()}
+
+
+class ProgressVerdict(BaseModel):
+    """Generic semantic decision made at an adaptive CodeAct boundary."""
+
+    decision: Literal["extend", "finalize", "stop"]
+    checkpoint: str = ""
+    reason: str = ""
+
+
+class SemanticProgressJudge(Agent):
+    @strategy(
+        _PlainTextPredictStrategy(
+            PredictConfig(max_retries=2, max_tokens=4096, max_param_chars=24_000)
+        )
+    )
+    async def assess(
+        self,
+        objective: str,
+        previous_checkpoint: str,
+        recent_activity: str,
+    ) -> str:
+        """Judge whether a generic CodeAct session is making semantic progress.
+
+        Progress means becoming materially closer to returning a valid result for
+        objective. Activity alone is not progress. New reads count only when they
+        resolve a relevant unknown. Repeated investigation, unchanged drafts,
+        repeated errors, and cosmetic state changes are stagnation.
+
+        Use extend when recent activity materially advances the result. Use finalize
+        when enough evidence exists and the working agent should stop investigating
+        and return its best valid result. Use stop when the agent is cycling or
+        cannot make meaningful progress.
+
+        Do not reason at length. Respond in at most three short plain-text lines:
+        decision=extend|finalize|stop
+        checkpoint=<completed work and remaining obstacle>
+        reason=<brief reason for the decision>
+        """
+        ...
+
+
+@dataclass(frozen=True)
+class AdaptiveBudgetConfig:
+    """Task-independent policy for extending bounded CodeAct sessions."""
+
+    extension_iterations: int = 10
+    finalization_grace_iterations: int = 3
+    hard_max_iterations: int | None = 100
+    recent_event_limit: int = 30
+    max_event_chars: int = 800
+
+    def __post_init__(self) -> None:
+        if self.extension_iterations < 1:
+            raise ValueError("extension_iterations must be positive")
+        if self.finalization_grace_iterations < 1:
+            raise ValueError("finalization_grace_iterations must be positive")
+        if self.hard_max_iterations is not None and self.hard_max_iterations < 1:
+            raise ValueError("hard_max_iterations must be positive or None")
+        if self.recent_event_limit < 1 or self.max_event_chars < 1:
+            raise ValueError("event summary limits must be positive")
+
+
+ProgressEvaluator = Callable[[str, str, str], Awaitable[ProgressVerdict]]
+
+
+class AdaptiveCodeActStrategy(CodeActStrategy):
+    """Extend CodeAct in semantic-progress chunks using only public NOOA APIs.
+
+    Each chunk is a normal ``CodeActStrategy.execute`` call. NOOA writes the
+    exhausted chunk's locals back to ``CurrentCall.session_locals`` and retains
+    its conversation events, so the next chunk resumes without copying or
+    overriding NOOA's generation loop.
+    """
+
+    def __init__(
+        self,
+        config: CodeActConfig,
+        *,
+        adaptive: AdaptiveBudgetConfig | None = None,
+        progress_evaluator: ProgressEvaluator | None = None,
+        error_formatter=None,
+    ) -> None:
+        if config.max_iterations is None or config.max_iterations < 1:
+            raise ValueError("adaptive CodeAct requires a positive initial max_iterations")
+        super().__init__(config, error_formatter=error_formatter)
+        self.adaptive = adaptive or AdaptiveBudgetConfig()
+        self.progress_evaluator = progress_evaluator
+
+    @staticmethod
+    def _iteration_exhausted(error: GenerationError) -> bool:
+        message = str(error)
+        return "max_iterations=" in message and "Unable to complete" in message
+
+    def _recent_activity(self, runtime, call) -> str:
+        events = runtime.event_manager.filter(
+            call_id=call.id,
+            limit=self.adaptive.recent_event_limit,
+        )
+        rendered = []
+        for event in events:
+            try:
+                payload = event.model_dump(exclude_none=True, mode="json")
+                event_text = json.dumps(payload, sort_keys=True, default=str)
+            except Exception:
+                event_text = repr(event)
+            rendered.append(
+                f"{getattr(event, 'event_type', type(event).__name__)}: "
+                f"{event_text[: self.adaptive.max_event_chars]}"
+            )
+        return "\n".join(rendered) or "No recorded activity."
+
+    @staticmethod
+    def _objective(call) -> str:
+        return "\n".join(
+            part
+            for part in (
+                f"method: {call.method_name}",
+                f"signature: {call.signature}" if call.signature else "",
+                f"return type: {call.return_type}" if call.return_type else "",
+                call.docstring or "",
+            )
+            if part
+        )
+
+    async def _assess_progress(
+        self,
+        runtime,
+        call,
+        checkpoint: str,
+    ) -> ProgressVerdict:
+        objective = self._objective(call)
+        activity = self._recent_activity(runtime, call)
+        try:
+            if self.progress_evaluator is not None:
+                return await self.progress_evaluator(objective, checkpoint, activity)
+            response = await SemanticProgressJudge(llm=runtime.agent.llm).assess(
+                objective,
+                checkpoint,
+                activity,
+            )
+            return self._parse_progress_verdict(response, checkpoint)
+        except Exception as error:
+            runtime.event_manager.add(
+                Feedback(
+                    content=(
+                        "Semantic progress review was unavailable; continue for "
+                        "one bounded extension and return a valid result if ready. "
+                        f"Reviewer error: {type(error).__name__}: {error}"
+                    )
+                )
+            )
+            return ProgressVerdict(
+                decision="extend",
+                checkpoint=checkpoint,
+                reason=f"semantic progress reviewer failed: {type(error).__name__}",
+            )
+
+    @staticmethod
+    def _parse_progress_verdict(
+        response: str,
+        previous_checkpoint: str = "",
+    ) -> ProgressVerdict:
+        text = response.strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json|text)?\s*", "", text, flags=re.IGNORECASE)
+            text = re.sub(r"\s*```$", "", text)
+
+        try:
+            payload = json.loads(text)
+        except (json.JSONDecodeError, TypeError):
+            payload = None
+        if isinstance(payload, dict):
+            if payload.get("decision") in {"extend", "finalize", "stop"}:
+                return ProgressVerdict.model_validate(payload)
+            if isinstance(payload.get("value"), str):
+                text = payload["value"].strip()
+
+        decision_match = re.search(
+            r"(?im)^\s*decision\s*[:=]\s*[\"']?(extend|finalize|stop)\b",
+            text,
+        )
+
+        def field(name: str) -> str:
+            match = re.search(
+                rf"(?im)^\s*{name}\s*[:=]\s*(.+?)\s*$",
+                text,
+            )
+            return match.group(1).strip().strip("\"'") if match else ""
+
+        if decision_match:
+            return ProgressVerdict(
+                decision=decision_match.group(1).lower(),
+                checkpoint=field("checkpoint") or previous_checkpoint,
+                reason=field("reason"),
+            )
+
+        return ProgressVerdict(
+            decision="finalize",
+            checkpoint=previous_checkpoint,
+            reason="semantic progress verdict was not parseable",
+        )
+
+    def _chunk_strategy(self, iterations: int) -> CodeActStrategy:
+        config = self.config.model_copy(update={"max_iterations": iterations})
+        return CodeActStrategy(config, error_formatter=self.error_formatter)
+
+    async def execute(self, runtime, call):
+        if call.session_locals is None:
+            call = replace(call, session_locals={})
+
+        initial = self.config.max_iterations
+        assert initial is not None
+        total_iterations = 0
+        chunk_iterations = initial
+        checkpoint = ""
+        finalizing = False
+
+        while True:
+            try:
+                return await self._chunk_strategy(chunk_iterations).execute(runtime, call)
+            except GenerationError as error:
+                if not self._iteration_exhausted(error):
+                    raise
+                total_iterations += chunk_iterations
+                if finalizing:
+                    raise GenerationError(
+                        "Adaptive CodeAct could not return a valid result during "
+                        "the finalization grace window."
+                    ) from error
+
+                verdict = await self._assess_progress(runtime, call, checkpoint)
+                checkpoint = verdict.checkpoint
+                if verdict.decision == "stop":
+                    raise GenerationError(
+                        "Adaptive CodeAct stopped after semantic stagnation: "
+                        + (verdict.reason or "no meaningful progress")
+                    ) from error
+
+                grace = self.adaptive.finalization_grace_iterations
+                hard_limit = self.adaptive.hard_max_iterations
+                extension_room = None
+                if hard_limit is not None:
+                    extension_room = max(hard_limit - total_iterations - grace, 0)
+
+                if verdict.decision == "extend" and (
+                    extension_room is None or extension_room > 0
+                ):
+                    chunk_iterations = self.adaptive.extension_iterations
+                    if extension_room is not None:
+                        chunk_iterations = min(chunk_iterations, extension_room)
+                    runtime.event_manager.add(
+                        Feedback(
+                            content=(
+                                "Semantic progress review: continue from this "
+                                f"checkpoint: {checkpoint or verdict.reason}. "
+                                "Return the valid result as soon as it is complete."
+                            )
+                        )
+                    )
+                    continue
+
+                finalizing = True
+                chunk_iterations = grace
+                runtime.event_manager.add(
+                    Feedback(
+                        content=(
+                            "Semantic progress review: stop further investigation. "
+                            "Return the best valid result now using the evidence and "
+                            f"state already collected. Reason: {verdict.reason or checkpoint}."
+                        )
+                    )
+                )
+
 _INPUT_PROPOSER_STRATEGY = CodeActStrategy(
     CodeActConfig(
         max_iterations=30,
@@ -256,6 +558,23 @@ _INPUT_CRITIC_STRATEGY = CompatiblePredictStrategy(
         max_param_chars=30_000,
     )
 )
+
+_INSTRUMENTATION_PROPOSER_STRATEGY = AdaptiveCodeActStrategy(
+    CodeActConfig(
+        max_iterations=50,
+        max_retries=1,
+        max_consecutive_text_only=2,
+        cell_timeout=30,
+        max_tokens=32_768,
+        max_tool_calls=50,
+    ),
+    adaptive=AdaptiveBudgetConfig(
+        extension_iterations=10,
+        finalization_grace_iterations=3,
+        hard_max_iterations=100,
+    ),
+)
+
 
 
 class HelloAgent(Agent):
@@ -302,6 +621,14 @@ class InputProposer(SourceAgent):
         repository. Every command must be one direct argv invocation. Put leading
         environment assignments in separate argv entries. Never use a shell, shell
         operators, sed, repository-writing setup, or embedded repetition loops.
+
+        When a requested external path must update a repository YAML config rather
+        than a supported command-line option, add a config_overlays entry. Its path
+        must be an existing repository-relative .yaml or .yml file and merge must
+        contain only the required mapping values. The runner applies these overlays
+        only in disposable execution worktrees; never encode the update in a shell
+        command or leave a provided dataset path unresolved.
+
 
         The smoke command must use representative real data and perform only one or
         two complete training updates: load data, forward, finite loss, backward, and
@@ -350,6 +677,15 @@ class InputContractCritic(Agent):
             problem = self._command_problem(command)
             if problem:
                 violations.append(f"{name} {problem}")
+        seen_overlay_paths: set[str] = set()
+        for overlay in spec.config_overlays:
+            problem = self._overlay_problem(overlay.path, overlay.merge)
+            if overlay.path in seen_overlay_paths:
+                problem = "is declared more than once"
+            seen_overlay_paths.add(overlay.path)
+            if problem:
+                violations.append(f"config overlay {overlay.path!r} {problem}")
+
         contract_problems = [*missing, *violations]
         if contract_problems:
             feedback = "Input contract violations: " + ", ".join(contract_problems)
@@ -384,6 +720,18 @@ class InputContractCritic(Agent):
             return "must not invoke a shell"
         return ""
 
+    @staticmethod
+    def _overlay_problem(path: str, merge: dict[str, object]) -> str:
+        target = Path(path)
+        if target.is_absolute() or ".." in target.parts:
+            return "must use a repository-relative path without '..'"
+        if target.suffix.lower() not in {".yaml", ".yml"}:
+            return "must target a .yaml or .yml file"
+        if not merge:
+            return "must contain at least one value to merge"
+        return ""
+
+
 
 class InputCritic(SourceAgent):
     """Perform one LLM review over bounded, deterministically collected evidence."""
@@ -410,6 +758,12 @@ class InputCritic(SourceAgent):
         representative, or commands that invent unsupported arguments. Give concise,
         actionable feedback that the proposer can use in its next attempt.
 
+        When direct configuration files need external values, require a
+        config_overlays entry that targets the relevant YAML file and merges the
+        supplied value. Reject a spec that relies on a dirty primary checkout for
+        such configuration; every execution uses a clean disposable worktree.
+
+
         Set requires_human only for genuinely external missing facts such as dataset
         location, credentials, unavailable hardware choices, or an unspecified
         correctness requirement. Repository dirtiness is not missing human input.
@@ -425,6 +779,16 @@ class InputCritic(SourceAgent):
         working_directory = spec.working_directory or "."
         sections = [f"working_directory: {working_directory}"]
 
+        if spec.config_overlays:
+            sections.append(
+                "config overlays:\n"
+                + "\n".join(
+                    f"{overlay.path}: {json.dumps(overlay.merge, sort_keys=True)}"
+                    for overlay in spec.config_overlays
+                )
+            )
+
+
         pattern = (
             "**/*"
             if working_directory == "."
@@ -436,8 +800,13 @@ class InputCritic(SourceAgent):
         except (OSError, RuntimeError, ValueError) as error:
             sections.append(f"recipe file listing unavailable: {error}")
 
+
         referenced_paths: set[str] = set()
         selectors: set[str] = set()
+        referenced_paths.update(
+            overlay.path for overlay in spec.config_overlays
+        )
+
         for command in (
             spec.smoke_command,
             spec.benchmark_command,
@@ -840,19 +1209,128 @@ class Runner(Agent):
 
 
 class InstrumentationProposer(SourceAgent):
-    @strategy(CodeActStrategy())
+    @strategy(_INSTRUMENTATION_PROPOSER_STRATEGY)
     async def propose(
         self,
         spec: TrainingSpec,
         required_ranges: tuple[str, ...],
         previous: Critique | None,
     ) -> InstrumentationPlan:
-        """Inspect the training loop and propose the smallest instrumentation patch covering
-        every required range. Resolve the verifier's feedback without changing training behavior.
+        """Inspect the training loop and return a valid, minimal instrumentation patch.
+
+        You have an initial 50 CodeAct iterations. A task-independent semantic
+        progress reviewer may grant 10-iteration extensions up to 100 total turns,
+        or require immediate finalization when exploration is no longer useful.
+        Finish repository discovery by about iteration 25, then construct and return
+        the best complete InstrumentationPlan. Do not execute, apply, or validate the patch
+        yourself and do not invoke subprocess or shell commands; a separate critic
+        applies the patch, performs static checks, and runs a bounded profile validation
+        in a disposable Git worktree. Any failure is returned as feedback for your next
+        proposal, so resolve exact runtime API errors rather than merely compiling.
+
+        Resolve all previous critic feedback. Inspect existing profiler support first
+        and integrate with it instead of creating a competing profiler. The patch must
+        be a syntactically valid unified Git diff against repository HEAD with accurate
+        hunk counts and context; it must apply using git apply.
+
+        Preserve numerics, sample order, optimizer behavior, and normal execution when
+        profiling is disabled. Instrumentation must be opt-in. Emit every required
+        range name, including one outer train_step range and a dataloader_wait range
+        that isolates iterator advancement. Place profiler.step() exactly once per
+        logical training step. Also instrument feature construction, distributed
+        synchronization, validation, or checkpoint work when those phases actually
+        exist; do not add misleading empty ranges.
+
+        Capture a bounded Kineto trace after model/compiler, dataloader, and allocator
+        warmup, with five steady-state active iterations by default. Use unique trace
+        names per rank for distributed runs. Keep stack and shape collection disabled
+        in the primary capture unless the existing profiler requires them.
+
+        After profiler finalization, the final non-empty stdout line must be a JSON
+        object accepted as TraceResult with completed=true, the actual trace path
+        inside the working tree, the emitted range names, and a non-empty factual
+        summary. Print nothing after that JSON object. Do not import the simplified
+        package from the training repository merely to construct this JSON.
+
+        Make no optimization or unrelated source change and never claim profiled wall
+        time is baseline performance.
         """
         ...
 
 
+class InstrumentationCritic(Agent):
+    environment: Annotated[TrainingEnvironment, hidden]
+
+    def __init__(self, *, environment: TrainingEnvironment, **kwargs):
+        super().__init__(**kwargs)
+        self.environment = environment
+
+    def review(
+        self,
+        spec: TrainingSpec,
+        plan: InstrumentationPlan,
+        required_ranges: tuple[str, ...],
+    ) -> Critique:
+        """Apply, statically check, then execute a bounded profile validation."""
+        missing = sorted(set(required_ranges) - set(plan.ranges))
+        problems = []
+        if missing:
+            problems.append("missing ranges: " + ", ".join(missing))
+        validation = self.environment.validate_instrumentation(spec, plan)
+        if not validation.completed:
+            problems.append(validation.error or "instrumentation preflight failed")
+        if not problems:
+            runtime = self.environment.validate_instrumentation_runtime(spec, plan)
+            if not runtime.completed:
+                problems.append(
+                    runtime.error or "instrumentation runtime validation failed"
+                )
+        return Critique(accepted=not problems, feedback="; ".join(problems))
+
+
+
+class InstrumentationAcceptanceError(RuntimeError):
+    """Raised when no instrumentation patch passes runtime validation."""
+
+
+class InstrumentationAcceptanceAgent(Agent):
+    """Propose instrumentation patches until a bounded profile validation passes."""
+
+    proposer: Annotated[InstrumentationProposer, hidden]
+    critic: Annotated[InstrumentationCritic, hidden]
+
+    def __init__(
+        self,
+        *,
+        proposer: InstrumentationProposer,
+        critic: InstrumentationCritic,
+        max_attempts: int = 3,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
+        self.proposer = proposer
+        self.critic = critic
+        self.max_attempts = max_attempts
+
+    async def accept(
+        self,
+        spec: TrainingSpec,
+        required_ranges: tuple[str, ...],
+        previous: Critique | None = None,
+    ) -> InstrumentationPlan:
+        """Return the first patch that passes static and runtime validation."""
+        feedback = previous
+        for _attempt in range(self.max_attempts):
+            plan = await self.proposer.propose(spec, required_ranges, feedback)
+            feedback = self.critic.review(spec, plan, required_ranges)
+            if feedback.accepted:
+                return plan
+        raise InstrumentationAcceptanceError(
+            "instrumentation proposal failed after all attempts: "
+            + (feedback.feedback if feedback else "no critique")
+        )
 class TraceCritic(Agent):
     def review(self, trace: TraceResult, required_ranges: tuple[str, ...]) -> Critique:
         missing = sorted(set(required_ranges) - set(trace.ranges))
@@ -976,6 +1454,7 @@ class Agents:
     input_critic: InputCritic
     runner: Runner
     instrumentation: InstrumentationProposer
+    instrumentation_critic: InstrumentationCritic
     trace_critic: TraceCritic
     hotspots: HotspotAnalyzer
     hotspot_critic: HotspotCritic
@@ -996,6 +1475,9 @@ def create_agents(
         input_critic=InputCritic(llm=llm, source=source),
         runner=Runner(llm=llm, environment=environment),
         instrumentation=InstrumentationProposer(llm=llm, source=source),
+        instrumentation_critic=InstrumentationCritic(
+            llm=llm, environment=environment
+        ),
         trace_critic=TraceCritic(llm=llm),
         hotspots=HotspotAnalyzer(llm=llm),
         hotspot_critic=HotspotCritic(llm=llm),

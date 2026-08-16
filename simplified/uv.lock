@@ -1125,6 +1125,7 @@ source = { editable = "." }
 dependencies = [
     { name = "nooa" },
     { name = "pydantic" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -1136,6 +1137,7 @@ dev = [
 requires-dist = [
     { name = "nooa" },
     { name = "pydantic", specifier = ">=2" },
+    { name = "pyyaml", specifier = ">=6" },
 ]
 
 [package.metadata.requires-dev]

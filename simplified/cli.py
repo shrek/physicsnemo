@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import yaml
 from contextlib import contextmanager
 from fnmatch import fnmatch
 from pathlib import Path
@@ -35,6 +36,8 @@ from simplified.agents import (
     InputContractCritic,
     InputCritic,
     InputProposer,
+    InstrumentationAcceptanceAgent,
+    InstrumentationCritic,
     InstrumentationProposer,
     ReportBuilder,
     Runner,
@@ -157,7 +160,13 @@ class LocalSourceEnvironment:
 
 
 class LocalTrainingEnvironment:
-    """Execute real commands, isolating proposed patches in Git worktrees."""
+    """Execute real commands, isolating proposed patches in Git worktrees.
+
+    Portable training specs use ``python``. When the repository has its usual
+    local virtual environment, this runner resolves that portable executable to
+    the repository interpreter and exposes the repository on ``PYTHONPATH``.
+    The same preparation is used for validation and every execution path.
+    """
 
     def __init__(
         self,
@@ -170,29 +179,244 @@ class LocalTrainingEnvironment:
         self.timeout = timeout
         self.artifact_directory = Path(artifact_directory).resolve()
 
-    def preflight(self, spec: TrainingSpec) -> RunResult:
-        """Validate command paths without launching training."""
+    @staticmethod
+    def _merge_yaml_mappings(
+        existing: dict[str, object],
+        update: dict[str, object],
+    ) -> dict[str, object]:
+        result = dict(existing)
+        for key, value in update.items():
+            previous = result.get(key)
+            if isinstance(previous, dict) and isinstance(value, dict):
+                result[key] = LocalTrainingEnvironment._merge_yaml_mappings(
+                    previous, value
+                )
+            else:
+                result[key] = value
+        return result
+
+    def _apply_config_overlays(self, spec: TrainingSpec, worktree: Path) -> None:
+        updated_paths: set[Path] = set()
+        for overlay in spec.config_overlays:
+            relative_path = Path(overlay.path)
+            if relative_path.is_absolute():
+                raise ValueError(
+                    f"config overlay path must be relative to the repository: {overlay.path}"
+                )
+            if relative_path.suffix.lower() not in {".yaml", ".yml"}:
+                raise ValueError(
+                    f"config overlay must target a YAML file: {overlay.path}"
+                )
+            target = (worktree / relative_path).resolve()
+            if not target.is_relative_to(worktree):
+                raise ValueError(
+                    f"config overlay path escapes the repository: {overlay.path}"
+                )
+            if target in updated_paths:
+                raise ValueError(
+                    f"config overlay targets {overlay.path!r} more than once"
+                )
+            if not target.is_file():
+                raise ValueError(f"config overlay file does not exist: {overlay.path}")
+            try:
+                loaded = yaml.safe_load(target.read_text(encoding="utf-8"))
+            except yaml.YAMLError as error:
+                raise ValueError(
+                    f"could not parse config overlay file {overlay.path}: {error}"
+                ) from error
+            if loaded is None:
+                loaded = {}
+            if not isinstance(loaded, dict):
+                raise ValueError(
+                    f"config overlay file must contain a YAML mapping: {overlay.path}"
+                )
+            merged = self._merge_yaml_mappings(loaded, overlay.merge)
+            target.write_text(
+                yaml.safe_dump(merged, sort_keys=False),
+                encoding="utf-8",
+            )
+            updated_paths.add(target)
+
+    @contextmanager
+    def _execution_worktree(
+        self, spec: TrainingSpec, patch: str = ""
+    ) -> Iterator[Path]:
+        with self._patched_worktree(patch) as worktree:
+            self._apply_config_overlays(spec, worktree)
+            yield worktree
+
+
+    def validate_instrumentation(
+        self, spec: TrainingSpec, plan: InstrumentationPlan
+    ) -> RunResult:
+        """Apply a plan in a disposable worktree and run cheap static checks."""
         try:
-            cwd = self._working_directory(spec, self.root)
-            for name, command in (
-                ("smoke_command", spec.smoke_command),
-                ("benchmark_command", spec.benchmark_command),
-                ("profile_command", spec.profile_command),
-            ):
-                self._validate_command(name, command, cwd)
+            with self._execution_worktree(spec, plan.patch) as worktree:
+                command_cwd = self._working_directory(spec, worktree)
+                self._validate_command(
+                    "profile_command",
+                    spec.profile_command,
+                    command_cwd,
+                    repository_root=worktree,
+                )
+                diff_check = subprocess.run(
+                    ["git", "-C", str(worktree), "diff", "--check"],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                if diff_check.returncode != 0:
+                    raise RuntimeError(
+                        diff_check.stderr.strip()
+                        or diff_check.stdout.strip()
+                        or "instrumentation patch failed git diff --check"
+                    )
+                changed = subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(worktree),
+                        "diff",
+                        "--name-only",
+                        "--diff-filter=ACMR",
+                        "HEAD",
+                    ],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                if changed.returncode != 0:
+                    raise RuntimeError(
+                        changed.stderr.strip() or "could not inspect patched files"
+                    )
+                for relative in changed.stdout.splitlines():
+                    target = (worktree / relative).resolve()
+                    if target.suffix != ".py" or not target.is_relative_to(worktree):
+                        continue
+                    compile(
+                        target.read_text(errors="replace"),
+                        relative,
+                        "exec",
+                    )
+        except (OSError, RuntimeError, SyntaxError, ValueError) as error:
+            return RunResult(
+                completed=False,
+                error=f"instrumentation preflight failed: {error}",
+            )
+        return RunResult(completed=True)
+
+    def validate_instrumentation_runtime(
+        self, spec: TrainingSpec, plan: InstrumentationPlan
+    ) -> RunResult:
+        """Run a bounded profiled execution of an applied instrumentation plan.
+
+        This disposable validation capture proves that the patch can initialize
+        the recipe's profiler API and emit a usable trace. It does not preserve
+        the trace or replace the full profile step.
+        """
+        try:
+            with self._execution_worktree(spec, plan.patch) as worktree:
+                command_cwd = self._working_directory(spec, worktree)
+                self._validate_command(
+                    "profile_command",
+                    spec.profile_command,
+                    command_cwd,
+                    repository_root=worktree,
+                )
+                result = self._run(
+                    spec.profile_command,
+                    command_cwd,
+                    timeout=min(self.timeout, 180),
+                )
+                if result.returncode != 0:
+                    return RunResult(
+                        completed=False,
+                        error=(
+                            "instrumentation runtime validation failed: "
+                            + self._error(result)
+                        ),
+                    )
+                trace = TraceResult.model_validate(self._last_json(result.stdout))
+                if not trace.completed:
+                    return RunResult(
+                        completed=False,
+                        error=(
+                            "instrumentation runtime validation reported failure: "
+                            + (trace.error or "unknown error")
+                        ),
+                    )
+                if not trace.summary:
+                    return RunResult(
+                        completed=False,
+                        error="instrumentation runtime validation emitted no trace summary",
+                    )
+                missing_ranges = sorted(set(plan.ranges) - set(trace.ranges))
+                if missing_ranges:
+                    return RunResult(
+                        completed=False,
+                        error=(
+                            "instrumentation runtime validation did not report ranges: "
+                            + ", ".join(missing_ranges)
+                        ),
+                    )
+                if not trace.path:
+                    return RunResult(
+                        completed=False,
+                        error="instrumentation runtime validation emitted no trace path",
+                    )
+                trace_path = Path(trace.path)
+                trace_path = (
+                    trace_path
+                    if trace_path.is_absolute()
+                    else command_cwd / trace_path
+                ).resolve()
+                if not trace_path.is_file() or not trace_path.is_relative_to(worktree):
+                    return RunResult(
+                        completed=False,
+                        error=(
+                            "instrumentation runtime validation emitted a missing "
+                            "or out-of-worktree trace path: "
+                            f"{trace.path}"
+                        ),
+                    )
+        except (OSError, RuntimeError, subprocess.TimeoutExpired, ValueError) as error:
+            return RunResult(
+                completed=False,
+                error=f"instrumentation runtime validation failed: {error}",
+            )
+        return RunResult(completed=True)
+
+    def preflight(self, spec: TrainingSpec) -> RunResult:
+        """Validate commands and overlays in the same clean checkout used for runs."""
+        try:
+            with self._execution_worktree(spec) as worktree:
+                cwd = self._working_directory(spec, worktree)
+                for name, command in (
+                    ("smoke_command", spec.smoke_command),
+                    ("benchmark_command", spec.benchmark_command),
+                    ("profile_command", spec.profile_command),
+                ):
+                    self._validate_command(
+                        name,
+                        command,
+                        cwd,
+                        repository_root=worktree,
+                    )
         except (OSError, RuntimeError, ValueError) as error:
             return RunResult(completed=False, error=str(error))
         return RunResult(completed=True)
 
     def smoke(self, spec: TrainingSpec) -> RunResult:
-        preflight = self.preflight(spec)
-        if not preflight.completed:
-            return preflight
         try:
-            result = self._run(
-                spec.smoke_command,
-                self._working_directory(spec, self.root),
-            )
+            with self._execution_worktree(spec) as worktree:
+                cwd = self._working_directory(spec, worktree)
+                self._validate_command(
+                    "smoke_command",
+                    spec.smoke_command,
+                    cwd,
+                    repository_root=worktree,
+                )
+                result = self._run(spec.smoke_command, cwd)
         except (OSError, RuntimeError, subprocess.TimeoutExpired, ValueError) as error:
             return RunResult(completed=False, error=str(error))
         return RunResult(
@@ -201,14 +425,16 @@ class LocalTrainingEnvironment:
         )
 
     def benchmark_log(self, spec: TrainingSpec) -> BenchmarkLog:
-        preflight = self.preflight(spec)
-        if not preflight.completed:
-            return BenchmarkLog(completed=False, error=preflight.error)
         try:
-            result = self._run(
-                spec.benchmark_command,
-                self._working_directory(spec, self.root),
-            )
+            with self._execution_worktree(spec) as worktree:
+                cwd = self._working_directory(spec, worktree)
+                self._validate_command(
+                    "benchmark_command",
+                    spec.benchmark_command,
+                    cwd,
+                    repository_root=worktree,
+                )
+                result = self._run(spec.benchmark_command, cwd)
         except (OSError, RuntimeError, subprocess.TimeoutExpired, ValueError) as error:
             return BenchmarkLog(completed=False, error=str(error))
         if result.returncode != 0:
@@ -230,7 +456,7 @@ class LocalTrainingEnvironment:
 
     def profile(self, spec: TrainingSpec, plan: InstrumentationPlan) -> TraceResult:
         try:
-            with self._patched_worktree(plan.patch) as worktree:
+            with self._execution_worktree(spec, plan.patch) as worktree:
                 command_cwd = self._working_directory(spec, worktree)
                 result = self._run(spec.profile_command, command_cwd)
                 if result.returncode != 0:
@@ -244,7 +470,7 @@ class LocalTrainingEnvironment:
         self, spec: TrainingSpec, proposal: ChangeProposal
     ) -> BenchmarkLog:
         try:
-            with self._patched_worktree(proposal.patch) as worktree:
+            with self._execution_worktree(spec, proposal.patch) as worktree:
                 result = self._run(
                     spec.benchmark_command,
                     self._working_directory(spec, worktree),
@@ -293,7 +519,10 @@ class LocalTrainingEnvironment:
         name: str,
         command: tuple[str, ...],
         cwd: Path,
+        *,
+        repository_root: Path | None = None,
     ) -> None:
+        repository_root = (repository_root or self.root).resolve()
         argv, environment = self._prepare_command(command)
 
         executable = Path(argv[0])
@@ -319,16 +548,16 @@ class LocalTrainingEnvironment:
             if script_path.is_absolute()
             else (cwd / script_path).resolve()
         )
-        if not target.is_relative_to(self.root):
+        if not target.is_relative_to(repository_root):
             raise ValueError(f"{name} script is outside the repository: {script}")
         if not target.is_file():
             raise ValueError(
                 f"{name} script does not exist relative to working_directory "
-                f"{cwd.relative_to(self.root)}: {script}"
+                f"{cwd.relative_to(repository_root)}: {script}"
             )
 
-    @staticmethod
     def _prepare_command(
+        self,
         command: tuple[str, ...],
     ) -> tuple[list[str], dict[str, str]]:
         if not command:
@@ -357,10 +586,34 @@ class LocalTrainingEnvironment:
             raise ValueError(
                 "shell executables are not supported; provide direct argv"
             )
+
+        # A generated spec should not need to know where a repository's
+        # environment lives. Resolve only conventional portable Python names;
+        # an explicit interpreter remains the user's choice.
+        repository_python = self.root / ".venv" / "bin" / "python"
+        if argv[0] in {"python", "python3"} and repository_python.is_file():
+            argv[0] = str(repository_python)
+
+        # Training source imports should resolve from the repository regardless
+        # of the disposable worktree used for execution. Preserve a user-supplied
+        # PYTHONPATH, including one already equal to the repository root.
+        current_pythonpath = environment.get("PYTHONPATH", "")
+        pythonpath_entries = [
+            entry for entry in current_pythonpath.split(os.pathsep) if entry
+        ]
+        repository_path = str(self.root)
+        if repository_path not in pythonpath_entries:
+            environment["PYTHONPATH"] = os.pathsep.join(
+                [repository_path, *pythonpath_entries]
+            )
+        elif current_pythonpath:
+            environment["PYTHONPATH"] = current_pythonpath
+        else:
+            environment["PYTHONPATH"] = repository_path
         return argv, environment
 
     def _run(
-        self, command: tuple[str, ...], cwd: Path
+        self, command: tuple[str, ...], cwd: Path, *, timeout: float | None = None
     ) -> subprocess.CompletedProcess[str]:
         argv, environment = self._prepare_command(command)
         return subprocess.run(
@@ -369,7 +622,7 @@ class LocalTrainingEnvironment:
             env=environment,
             text=True,
             capture_output=True,
-            timeout=self.timeout,
+            timeout=self.timeout if timeout is None else timeout,
             check=False,
         )
 
@@ -473,6 +726,10 @@ INPUTS: dict[str, tuple[tuple[str, type[BaseModel]], ...]] = {
     "smoke": (("spec", TrainingSpec),),
     "benchmark": (("spec", TrainingSpec),),
     "propose-instrumentation": (("spec", TrainingSpec),),
+    "review-instrumentation": (
+        ("spec", TrainingSpec),
+        ("plan", InstrumentationPlan),
+    ),
     "profile": (("spec", TrainingSpec), ("plan", InstrumentationPlan)),
     "review-trace": (("trace", TraceResult),),
     "analyze-hotspots": (("trace", TraceResult),),
@@ -728,9 +985,16 @@ async def _execute(args: argparse.Namespace) -> BaseModel:
                 values["spec"]
             )
         if args.step == "propose-instrumentation":
-            return await InstrumentationProposer(llm=llm, source=source).propose(
-                values["spec"], REQUIRED_RANGES, previous
-            )
+            return await InstrumentationAcceptanceAgent(
+                llm=llm,
+                proposer=InstrumentationProposer(llm=llm, source=source),
+                critic=InstrumentationCritic(llm=llm, environment=environment),
+                max_attempts=args.max_attempts,
+            ).accept(values["spec"], REQUIRED_RANGES, previous)
+        if args.step == "review-instrumentation":
+            return InstrumentationCritic(
+                llm=llm, environment=environment
+            ).review(values["spec"], values["plan"], REQUIRED_RANGES)
         if args.step == "profile":
             return environment.profile(values["spec"], values["plan"])
         if args.step == "review-trace":

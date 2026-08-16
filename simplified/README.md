@@ -132,6 +132,12 @@ uv run simplified-step review-inputs spec.json -o input-critique.json
 
 uv run simplified-step smoke spec.json --repo /path/to/training/repo -o smoke.json
 uv run simplified-step benchmark spec.json --repo /path/to/training/repo -o baseline.json
+uv run simplified-step propose-instrumentation spec.json \
+  --repo /path/to/training/repo -o instrumentation-plan.json
+uv run simplified-step review-instrumentation spec.json instrumentation-plan.json \
+  --repo /path/to/training/repo -o instrumentation-critique.json
+uv run simplified-step profile spec.json instrumentation-plan.json \
+  --repo /path/to/training/repo -o trace.json
 uv run simplified-step run-all request.txt \
   --repo /path/to/training/repo --human-in-the-loop -o result.json
 ```
@@ -153,6 +159,15 @@ representative steady-state run, and profile matches the benchmark workload whil
 capturing a bounded post-warmup window. Its feedback returns to the proposer. Input
 proposal is capped at thirty CodeAct iterations; each proposal and review has a
 300-second default deadline, configurable with `--agent-timeout`.
+
+Instrumentation proposal uses the local generic `AdaptiveCodeActStrategy`, which
+delegates unchanged execution chunks to NOOA's public `CodeActStrategy`. It starts
+with 50 iterations. At a boundary, a separate tool-free semantic judge compares
+the method objective, its previous checkpoint, and a bounded summary of recent
+events. Material progress grants 10 more iterations; sufficient evidence triggers
+a three-iteration finalization window; semantic stagnation stops the run. The
+configured hard ceiling is 100 iterations. Conversation events and CodeAct session
+locals are retained across chunks, and no installed NOOA source is modified.
 
 After human or semantic acceptance, the agent runs the smoke command before returning
 `spec.json`. Commands must be direct argv; shell executables, shell
@@ -182,6 +197,30 @@ require `--model` or `SIMPLIFIED_MODEL`. Complete NOOA traces are written to
 `--no-trace` to disable persistent tracing. `--previous critique.json` supplies
 retry feedback.
 
+A spec can carry YAML values that are needed at runtime but must not be committed,
+such as a local dataset root. Each overlay targets an existing repository-relative
+YAML file and is deep-merged only in the temporary worktree used by smoke,
+benchmark, instrumentation validation, profile, and candidate benchmarks:
+
+```json
+{
+  "config_overlays": [
+    {
+      "path": "examples/cfd/external_aerodynamics/unified_external_aero_recipe/datasets/dataset_paths.yaml",
+      "format": "yaml",
+      "merge": {
+        "drivaer_ml": "/mymount/ramu-data/datasets/drivaerml"
+      }
+    }
+  ]
+}
+```
+
+The source checkout and its tracked configuration are never modified. This is the
+right mechanism when a recipe reads a YAML file directly and does not support the
+same value as a command-line override.
+
+
 Add `--show-turns` to follow LLM turns, generated code, method/tool calls including
 `InputCritic.review`, `Runner.preflight`, and `Runner.smoke`, bounded arguments,
 and results live in the terminal. Its default compact view shows one-line activity
@@ -208,6 +247,16 @@ metric. Selected log excerpts are sent to the configured LLM, so benchmark outpu
 should still avoid secrets. Profile commands must emit a
 `TraceResult`. Instrumentation and candidate patches are applied
 in temporary Git worktrees, so their repository must be committed; trace files
+
+`propose-instrumentation` asks for opt-in, behavior-preserving ranges around the
+complete training step, dataloader wait, host-to-device transfer, forward, loss,
+backward, and optimizer step. It also asks for a bounded five-iteration
+steady-state capture after warmup and a final `TraceResult` JSON line.
+`review-instrumentation` applies the proposed patch in a disposable Git worktree,
+checks the profile command, runs `git diff --check`, and compiles every changed
+Python file without running the expensive training workload. The subsequent
+`profile` step is the runtime test: it executes the patched command, and the trace
+critic verifies successful output, the trace path, summary, and required ranges.
 created in the worktree are copied to `--artifacts` before cleanup.
 
 The normal functional tests use real local processes but no external LLM:

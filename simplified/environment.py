@@ -31,6 +31,14 @@ class InputValidationEnvironment(Protocol):
 
 
 class TrainingEnvironment(InputValidationEnvironment, Protocol):
+    def validate_instrumentation(
+        self, spec: TrainingSpec, plan: InstrumentationPlan
+    ) -> RunResult: ...
+    def validate_instrumentation_runtime(
+        self, spec: TrainingSpec, plan: InstrumentationPlan
+    ) -> RunResult: ...
+
+
     def benchmark_log(self, spec: TrainingSpec) -> BenchmarkLog: ...
 
     def benchmark(self, spec: TrainingSpec) -> BenchmarkResult: ...

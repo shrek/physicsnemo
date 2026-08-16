@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -19,12 +19,21 @@ class HelloResponse(Value):
     message: str = Field(min_length=1)
 
 
+class ConfigOverlay(Value):
+    """A YAML mapping merged into an existing config only in execution worktrees."""
+
+    path: str = Field(min_length=1)
+    format: Literal["yaml"] = "yaml"
+    merge: dict[str, Any] = Field(min_length=1)
+
+
 class TrainingSpec(Value):
     working_directory: str = Field(default=".", min_length=1)
     smoke_command: tuple[str, ...]
     benchmark_command: tuple[str, ...]
     profile_command: tuple[str, ...]
     correctness_tolerance: float = Field(ge=0)
+    config_overlays: tuple[ConfigOverlay, ...] = ()
     unresolved: tuple[str, ...] = ()
 
 

@@ -62,6 +62,11 @@ class TrainingOptimizer(Agent):
         feedback = None
         for _ in range(self.max_attempts):
             plan = await self.agents.instrumentation.propose(spec, REQUIRED_RANGES, feedback)
+            feedback = self.agents.instrumentation_critic.review(
+                spec, plan, REQUIRED_RANGES
+            )
+            if not feedback.accepted:
+                continue
             trace = self.agents.runner.profile(spec, plan)
             feedback = self.agents.trace_critic.review(trace, REQUIRED_RANGES)
             if feedback.accepted:
