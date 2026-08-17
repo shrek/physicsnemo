@@ -10,6 +10,7 @@ from simplified.types import (
     CandidateResult,
     ChangeProposal,
     InstrumentationPlan,
+    Phase1Report,
     RunResult,
     TraceResult,
     TrainingSpec,
@@ -44,6 +45,14 @@ class TrainingEnvironment(InputValidationEnvironment, Protocol):
     def benchmark(self, spec: TrainingSpec) -> BenchmarkResult: ...
 
     def profile(self, spec: TrainingSpec, plan: InstrumentationPlan) -> TraceResult: ...
+
+    def create_performance_report(
+        self,
+        spec: TrainingSpec,
+        baseline: BenchmarkResult,
+        plan: InstrumentationPlan,
+        trace: TraceResult,
+    ) -> Phase1Report: ...
 
     def benchmark_candidate(
         self, spec: TrainingSpec, proposal: ChangeProposal

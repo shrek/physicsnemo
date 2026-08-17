@@ -1,3 +1,7 @@
+# v0 interface notice
+
+Use [V0.md](V0.md) and [request.template.txt](request.template.txt). v0 requires a complete TOML request, validates it deterministically, and does not expose input-proposal, input-critic, or human-gate flows. The documentation below describes the retired prototype and is retained only as historical context.
+
 # Minimal NOOA training optimizer
 
 An isolated reimplementation of the ImproofBench training optimizer. It tries one

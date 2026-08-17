@@ -37,6 +37,7 @@ from simplified.types import (
     HotspotAnalysis,
     InstrumentationPlan,
     OptimizationResult,
+    Phase1Report,
     Route,
     RunResult,
     TraceResult,
@@ -1170,42 +1171,25 @@ class Runner(Agent):
         return self.environment.smoke(spec)
 
     async def benchmark(self, spec: TrainingSpec) -> BenchmarkResult:
-        log = self.environment.benchmark_log(spec)
-        if not log.completed:
-            raise RuntimeError(log.error or "benchmark command failed")
-        interpretation = await BenchmarkLogParser(
-            llm=self.llm, benchmark_log=log
-        ).parse()
-        if interpretation.benchmark is None:
-            raise RuntimeError(
-                interpretation.error or "benchmark log could not be interpreted"
-            )
-        return interpretation.benchmark
+        """Read the typed benchmark JSON emitted by the training command."""
+        return self.environment.benchmark(spec)
 
     def profile(self, spec: TrainingSpec, plan: InstrumentationPlan) -> TraceResult:
         return self.environment.profile(spec, plan)
 
+    def create_performance_report(
+        self,
+        spec: TrainingSpec,
+        baseline: BenchmarkResult,
+        plan: InstrumentationPlan,
+        trace: TraceResult,
+    ) -> Phase1Report:
+        return self.environment.create_performance_report(spec, baseline, plan, trace)
+
     async def benchmark_candidate(
         self, spec: TrainingSpec, proposal: ChangeProposal
     ) -> CandidateResult:
-        log = self.environment.benchmark_candidate_log(spec, proposal)
-        if not log.completed:
-            return CandidateResult(
-                completed=False, error=log.error or "candidate benchmark failed"
-            )
-        try:
-            interpretation = await BenchmarkLogParser(
-                llm=self.llm, benchmark_log=log
-            ).parse()
-        except Exception as error:
-            return CandidateResult(completed=False, error=str(error))
-        if interpretation.benchmark is None:
-            return CandidateResult(
-                completed=False,
-                error=interpretation.error
-                or "candidate benchmark log could not be interpreted",
-            )
-        return CandidateResult(completed=True, benchmark=interpretation.benchmark)
+        return self.environment.benchmark_candidate(spec, proposal)
 
 
 class InstrumentationProposer(SourceAgent):
@@ -1218,11 +1202,12 @@ class InstrumentationProposer(SourceAgent):
     ) -> InstrumentationPlan:
         """Inspect the training loop and return a valid, minimal instrumentation patch.
 
-        You have an initial 50 CodeAct iterations. A task-independent semantic
-        progress reviewer may grant 10-iteration extensions up to 100 total turns,
-        or require immediate finalization when exploration is no longer useful.
-        Finish repository discovery by about iteration 25, then construct and return
-        the best complete InstrumentationPlan. Do not execute, apply, or validate the patch
+        For this GeoTransolver task, begin finalizing by turn 18. You may use the
+        existing 50-turn CodeAct budget only while each additional turn makes material
+        progress toward a complete, applicable unified diff; otherwise return the best
+        complete InstrumentationPlan immediately. Finish repository discovery by turn
+        12 and reserve turns 13 through 18 for composing and checking the unified diff.
+        Do not execute, apply, or validate the patch
         yourself and do not invoke subprocess or shell commands; a separate critic
         applies the patch, performs static checks, and runs a bounded profile validation
         in a disposable Git worktree. Any failure is returned as feedback for your next
@@ -1232,6 +1217,26 @@ class InstrumentationProposer(SourceAgent):
         and integrate with it instead of creating a competing profiler. The patch must
         be a syntactically valid unified Git diff against repository HEAD with accurate
         hunk counts and context; it must apply using git apply.
+
+        For the GeoTransolver volume recipe, before inspecting implementation details,
+        use read_file to read these repository-local instructions:
+        - skills/physicsnemo-training-performance-tuner/SKILL.md
+        - skills/physicsnemo-training-performance-tuner/references/geotransolver-volume.md
+        - skills/physicsnemo-training-performance-tuner/references/phase1-protocol.md
+        Then inspect only these implementation files: the recipe's src/train.py,
+        src/v0_results.py, conf/train.yaml, conf/model/geotransolver_volume.yaml,
+        datasets/drivaer_ml_volume.yaml, and the PhysicsNeMo profiler interface and
+        torch wrapper. Do not call list_files after reading the three guidance files.
+        Apply the guidance as an instrumentation contract: retain the representative compiled
+        workload, capture a bounded post-warmup window, and separate dataloader,
+        geometry/feature construction, forward, loss, backward, and optimizer work
+        when those phases exist. Do not copy historical findings or make an
+        optimization recommendation before trace evidence exists.
+
+        This recipe already has an opt-in +v0_result=true bridge that emits the final
+        TraceResult after profiler finalization. Preserve that bridge and do not add a
+        second stdout-result mechanism. Ensure its trace contains the required range
+        names rather than merely returning declared names.
 
         Preserve numerics, sample order, optimizer behavior, and normal execution when
         profiling is disabled. Instrumentation must be opt-in. Emit every required
@@ -1358,13 +1363,6 @@ class HotspotAnalyzer(Agent):
         ...
 
 
-class HotspotCritic(Agent):
-    @strategy(CompatiblePredictStrategy())
-    async def review(self, trace: TraceResult, analysis: HotspotAnalysis) -> Critique:
-        """Accept only a non-empty, ranked hotspot analysis whose evidence is supported by
-        the trace. Give concise, actionable revision feedback when rejecting it.
-        """
-        ...
 
 
 class Router(Agent):
@@ -1388,8 +1386,12 @@ class ChangeProposer(SourceAgent):
         hotspot: Hotspot,
         route: Route,
         previous: Critique | None,
+        objective: str = "",
+        allowed_change_paths: tuple[str, ...] = (),
     ) -> ChangeProposal:
-        """Inspect the source and propose one minimal patch for the routed hotspot. Preserve
+        """Inspect the source and propose one minimal patch for the routed hotspot.
+
+        Objective: {objective}. Modify only: {allowed_change_paths}. Preserve
         training semantics and resolve the candidate verifier's feedback. Do not apply the patch
         or claim a speedup.
         """
@@ -1449,15 +1451,11 @@ class ReportBuilder(Agent):
 
 @dataclass(frozen=True)
 class Agents:
-    inputs: InputProposer
-    input_contract_critic: InputContractCritic
-    input_critic: InputCritic
     runner: Runner
     instrumentation: InstrumentationProposer
     instrumentation_critic: InstrumentationCritic
     trace_critic: TraceCritic
     hotspots: HotspotAnalyzer
-    hotspot_critic: HotspotCritic
     router: Router
     changes: ChangeProposer
     candidate_critic: CandidateCritic
@@ -1470,9 +1468,6 @@ def create_agents(
     environment: TrainingEnvironment,
 ) -> Agents:
     return Agents(
-        inputs=InputProposer(llm=llm, source=source),
-        input_contract_critic=InputContractCritic(llm=llm),
-        input_critic=InputCritic(llm=llm, source=source),
         runner=Runner(llm=llm, environment=environment),
         instrumentation=InstrumentationProposer(llm=llm, source=source),
         instrumentation_critic=InstrumentationCritic(
@@ -1480,7 +1475,6 @@ def create_agents(
         ),
         trace_critic=TraceCritic(llm=llm),
         hotspots=HotspotAnalyzer(llm=llm),
-        hotspot_critic=HotspotCritic(llm=llm),
         router=Router(llm=llm),
         changes=ChangeProposer(llm=llm, source=source),
         candidate_critic=CandidateCritic(llm=llm),

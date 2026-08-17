@@ -1,4 +1,4 @@
-"""Ordinary Python orchestration for the bounded proposal/critique loops."""
+"""Deterministic orchestration with bounded LLM proposal steps."""
 
 from __future__ import annotations
 
@@ -7,24 +7,16 @@ from typing import Annotated
 from nooa import Agent, hidden
 from nooa.unifiedllm import UnifiedLLM
 
-from simplified.agents import (
-    REQUIRED_RANGES,
-    Agents,
-    ClosedHumanGate,
-    HumanGate,
-    InputAcceptanceAgent,
-    InputAcceptanceError,
-)
-from simplified.types import Critique, OptimizationResult, TrainingRequest
+from simplified.agents import REQUIRED_RANGES, Agents
+from simplified.types import Critique, OptimizationResult, TrainingRequest, TrainingSpec
 
 
 class WorkflowError(RuntimeError):
-    pass
+    """Raised when a user contract or deterministic verifier fails."""
 
 
 class TrainingOptimizer(Agent):
     agents: Annotated[Agents, hidden]
-    input_acceptance: Annotated[InputAcceptanceAgent, hidden]
 
     def __init__(
         self,
@@ -32,39 +24,34 @@ class TrainingOptimizer(Agent):
         *,
         llm: UnifiedLLM,
         max_attempts: int = 3,
-        human_gate: HumanGate | None = None,
-        agent_timeout: float = 300,
     ):
         super().__init__(llm=llm)
         if max_attempts < 1:
             raise ValueError("max_attempts must be positive")
         self.agents = agents
         self.max_attempts = max_attempts
-        self.input_acceptance = InputAcceptanceAgent(
-            llm=llm,
-            proposer=agents.inputs,
-            contract_critic=agents.input_contract_critic,
-            critic=agents.input_critic,
-            human_gate=human_gate or ClosedHumanGate(),
-            validator=agents.runner,
-            max_attempts=max_attempts,
-            agent_timeout=agent_timeout,
-        )
 
     async def run(self, request: TrainingRequest) -> OptimizationResult:
-        try:
-            spec = await self.input_acceptance.accept(request)
-        except InputAcceptanceError as error:
-            raise WorkflowError(str(error)) from error
+        """Validate the detailed user contract, then execute one bounded run."""
+        self._validate_request(request)
+        spec = request.spec
+        preflight = self.agents.runner.preflight(spec)
+        if not preflight.completed:
+            raise WorkflowError("request preflight failed: " + preflight.error)
+        smoke = self.agents.runner.smoke(spec)
+        if not smoke.completed:
+            raise WorkflowError("request smoke failed: " + smoke.error)
 
         baseline = await self.agents.runner.benchmark(spec)
 
         feedback = None
         for _ in range(self.max_attempts):
             plan = await self.agents.instrumentation.propose(spec, REQUIRED_RANGES, feedback)
-            feedback = self.agents.instrumentation_critic.review(
-                spec, plan, REQUIRED_RANGES
-            )
+            feedback = self._validate_patch_scope(plan.patch, request.allowed_change_paths)
+            if feedback.accepted:
+                feedback = self.agents.instrumentation_critic.review(
+                    spec, plan, REQUIRED_RANGES
+                )
             if not feedback.accepted:
                 continue
             trace = self.agents.runner.profile(spec, plan)
@@ -74,22 +61,32 @@ class TrainingOptimizer(Agent):
         else:
             self._failed("instrumentation", feedback)
 
-        feedback = None
-        for _ in range(self.max_attempts):
-            analysis = await self.agents.hotspots.analyze(trace, feedback)
-            feedback = await self.agents.hotspot_critic.review(trace, analysis)
-            if feedback.accepted:
-                break
-        else:
-            self._failed("hotspot analysis", feedback)
-        if not analysis.hotspots:
-            raise WorkflowError("hotspot analysis returned no hotspots")
+        phase1_report = self.agents.runner.create_performance_report(
+            spec, baseline, plan, trace
+        )
+        if not phase1_report.completed:
+            raise WorkflowError(
+                "phase-1 performance report failed: " + phase1_report.error
+            )
+
+        analysis = await self.agents.hotspots.analyze(trace, None)
+        self._validate_analysis(trace, analysis)
 
         hotspot = analysis.hotspots[0]
         route = self.agents.router.route(hotspot)
         feedback = None
         for _ in range(self.max_attempts):
-            proposal = await self.agents.changes.propose(spec, hotspot, route, feedback)
+            proposal = await self.agents.changes.propose(
+                spec,
+                hotspot,
+                route,
+                feedback,
+                objective=request.objective,
+                allowed_change_paths=request.allowed_change_paths,
+            )
+            feedback = self._validate_patch_scope(proposal.patch, request.allowed_change_paths)
+            if not feedback.accepted:
+                continue
             candidate = await self.agents.runner.benchmark_candidate(spec, proposal)
             feedback = self.agents.candidate_critic.review(spec, baseline, candidate)
             if feedback.accepted:
@@ -99,7 +96,42 @@ class TrainingOptimizer(Agent):
 
         if candidate.benchmark is None:
             raise WorkflowError("accepted candidate has no benchmark")
-        return self.agents.report.build(baseline, candidate.benchmark, hotspot, proposal)
+        result = self.agents.report.build(baseline, candidate.benchmark, hotspot, proposal)
+        return result.model_copy(update={"phase1_report": phase1_report})
+
+    @staticmethod
+    def _validate_request(request: TrainingRequest) -> None:
+        """Reject incomplete v0 request files before any LLM or command runs."""
+        if request.spec.unresolved:
+            raise WorkflowError("request must not contain unresolved inputs")
+        for path in request.allowed_change_paths:
+            if path.startswith("/") or ".." in path.split("/"):
+                raise WorkflowError("allowed_change_paths must be repository-relative")
+
+    @staticmethod
+    def _validate_patch_scope(patch: str, allowed_paths: tuple[str, ...]) -> Critique:
+        """Reject patches that touch files outside the user's explicit scope."""
+        paths: list[str] = []
+        for line in patch.splitlines():
+            if not line.startswith("+++ b/"):
+                continue
+            path = line.removeprefix("+++ b/")
+            if path != "/dev/null":
+                paths.append(path)
+        if not paths:
+            return Critique(accepted=False, feedback="patch contains no changed files")
+        disallowed = [path for path in paths if not any(path == root.rstrip("/") or path.startswith(root.rstrip("/") + "/") for root in allowed_paths)]
+        if disallowed:
+            return Critique(accepted=False, feedback="patch changes paths outside allowed_change_paths: " + ", ".join(disallowed))
+        return Critique(accepted=True)
+
+    @staticmethod
+    def _validate_analysis(trace, analysis) -> None:
+        """Apply the small deterministic hotspot-output contract."""
+        if not analysis.hotspots:
+            raise WorkflowError("hotspot analysis returned no hotspots")
+        if not all(hotspot.evidence.strip() for hotspot in analysis.hotspots):
+            raise WorkflowError("hotspot analysis contains empty evidence")
 
     @staticmethod
     def _failed(stage: str, critique: Critique | None) -> None:

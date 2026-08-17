@@ -1,11 +1,6 @@
 from simplified.agents import (
     Agents,
-    ClosedHumanGate,
     HelloAgent,
-    HumanGateError,
-    InputAcceptanceAgent,
-    InputAcceptanceError,
-    TerminalHumanGate,
     create_agents,
 )
 from simplified.observability import (
@@ -19,14 +14,9 @@ from simplified.workflow import TrainingOptimizer, WorkflowError
 
 __all__ = [
     "Agents",
-    "ClosedHumanGate",
     "HelloAgent",
     "HelloResponse",
-    "HumanGateError",
-    "InputAcceptanceAgent",
-    "InputAcceptanceError",
     "ObservedRun",
-    "TerminalHumanGate",
     "TrainingOptimizer",
     "TrainingRequest",
     "WorkflowError",

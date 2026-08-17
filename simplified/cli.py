@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import tomllib
 import yaml
 from contextlib import contextmanager
 from fnmatch import fnmatch
@@ -26,16 +27,8 @@ from simplified.agents import (
     REQUIRED_RANGES,
     CandidateCritic,
     ChangeProposer,
-    ClosedHumanGate,
-    HumanGate,
-    TerminalHumanGate,
     HotspotAnalyzer,
-    HotspotCritic,
     HelloAgent,
-    InputAcceptanceAgent,
-    InputContractCritic,
-    InputCritic,
-    InputProposer,
     InstrumentationAcceptanceAgent,
     InstrumentationCritic,
     InstrumentationProposer,
@@ -46,6 +39,7 @@ from simplified.agents import (
     create_agents,
 )
 from simplified.observability import trace_for_cli
+from simplified.performance_report import create_phase1_report
 from simplified.workflow import TrainingOptimizer
 from simplified.types import (
     BenchmarkLog,
@@ -57,6 +51,7 @@ from simplified.types import (
     HotspotAnalysis,
     HelloResponse,
     InstrumentationPlan,
+    Phase1Report,
     Route,
     RunResult,
     TraceResult,
@@ -326,7 +321,7 @@ class LocalTrainingEnvironment:
                 result = self._run(
                     spec.profile_command,
                     command_cwd,
-                    timeout=min(self.timeout, 180),
+                    timeout=min(self.timeout, 360),
                 )
                 if result.returncode != 0:
                     return RunResult(
@@ -465,6 +460,23 @@ class LocalTrainingEnvironment:
                 return self._preserve_trace(trace, worktree, command_cwd)
         except (RuntimeError, subprocess.TimeoutExpired, ValueError) as error:
             return TraceResult(completed=False, error=str(error))
+
+    def create_performance_report(
+        self,
+        spec: TrainingSpec,
+        baseline: BenchmarkResult,
+        plan: InstrumentationPlan,
+        trace: TraceResult,
+    ) -> Phase1Report:
+        """Create the deterministic HTA-backed phase-1 analysis bundle."""
+        return create_phase1_report(
+            root=self.root,
+            artifact_directory=self.artifact_directory,
+            spec=spec,
+            baseline=baseline,
+            plan=plan,
+            trace=trace,
+        )
 
     def benchmark_candidate_log(
         self, spec: TrainingSpec, proposal: ChangeProposal
@@ -720,9 +732,7 @@ class LocalTrainingEnvironment:
 INPUTS: dict[str, tuple[tuple[str, type[BaseModel]], ...]] = {
     "hello": (),
     "run-all": (("request", TrainingRequest),),
-    "accept-inputs": (("request", TrainingRequest),),
-    "propose-inputs": (("request", TrainingRequest),),
-    "review-inputs": (("spec", TrainingSpec),),
+    "validate-request": (("request", TrainingRequest),),
     "smoke": (("spec", TrainingSpec),),
     "benchmark": (("spec", TrainingSpec),),
     "propose-instrumentation": (("spec", TrainingSpec),),
@@ -732,8 +742,13 @@ INPUTS: dict[str, tuple[tuple[str, type[BaseModel]], ...]] = {
     ),
     "profile": (("spec", TrainingSpec), ("plan", InstrumentationPlan)),
     "review-trace": (("trace", TraceResult),),
+    "create-performance-report": (
+        ("spec", TrainingSpec),
+        ("baseline", BenchmarkResult),
+        ("plan", InstrumentationPlan),
+        ("trace", TraceResult),
+    ),
     "analyze-hotspots": (("trace", TraceResult),),
-    "review-hotspots": (("trace", TraceResult), ("analysis", HotspotAnalysis)),
     "route-hotspot": (("hotspot", Hotspot),),
     "propose-change": (
         ("spec", TrainingSpec),
@@ -757,22 +772,21 @@ INPUTS: dict[str, tuple[tuple[str, type[BaseModel]], ...]] = {
 LLM_STEPS = {
     "hello",
     "run-all",
-    "accept-inputs",
-    "benchmark",
-    "benchmark-candidate",
-    "review-inputs",
-    "propose-inputs",
     "propose-instrumentation",
     "analyze-hotspots",
-    "review-hotspots",
     "propose-change",
 }
 
 
 def _load(path: str, model: type[BaseModel]) -> BaseModel:
     text = Path(path).read_text()
-    if model is TrainingRequest and not text.lstrip().startswith("{"):
-        return TrainingRequest(description=text.strip())
+    if model is TrainingRequest:
+        if text.lstrip().startswith("{"):
+            return TrainingRequest.model_validate_json(text)
+        try:
+            return TrainingRequest.model_validate(tomllib.loads(text))
+        except tomllib.TOMLDecodeError as error:
+            raise ValueError(f"request.txt must contain valid TOML: {error}") from error
     return model.model_validate_json(text)
 
 
@@ -819,8 +833,8 @@ def create_llm(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run exactly one optimizer step. Training requests may be plain text; "
-            "all other inputs and outputs are typed JSON artifacts."
+            "Run exactly one optimizer step. Training requests are complete TOML "
+            "contracts; all other inputs and outputs are typed JSON artifacts."
         )
     )
     parser.add_argument("step", choices=INPUTS)
@@ -845,18 +859,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--previous", help="optional Critique JSON for an LLM retry")
     parser.add_argument("--timeout", type=float, default=600)
-    parser.add_argument(
-        "--agent-timeout",
-        type=float,
-        default=300,
-        help="maximum seconds for each input proposal or review (default: 300)",
-    )
     parser.add_argument("--max-attempts", type=int, default=3)
-    parser.add_argument(
-        "--human-in-the-loop",
-        action="store_true",
-        help="ask for free-form terminal clarification when required",
-    )
     parser.add_argument(
         "--artifacts", default="runs", help="directory for preserved trace files"
     )
@@ -896,11 +899,6 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _human_gate(args: argparse.Namespace) -> HumanGate:
-    if args.human_in_the_loop:
-        return TerminalHumanGate(color=args.color)
-    return ClosedHumanGate()
-
 
 async def _execute(args: argparse.Namespace) -> BaseModel:
     contract = INPUTS[args.step]
@@ -934,50 +932,14 @@ async def _execute(args: argparse.Namespace) -> BaseModel:
                 agents,
                 llm=llm,
                 max_attempts=args.max_attempts,
-                human_gate=_human_gate(args),
-                agent_timeout=args.agent_timeout,
             ).run(values["request"])
-        if args.step == "accept-inputs":
-            proposer = InputProposer(llm=llm, source=source)
-            contract_critic = InputContractCritic(llm=llm)
-            critic = InputCritic(llm=llm, source=source)
-            validator = Runner(llm=llm, environment=environment)
-            acceptance = InputAcceptanceAgent(
-                llm=llm,
-                proposer=proposer,
-                contract_critic=contract_critic,
-                critic=critic,
-                human_gate=_human_gate(args),
-                validator=validator,
-                max_attempts=args.max_attempts,
-                agent_timeout=args.agent_timeout,
-            )
-            return await acceptance.accept(values["request"])
-        if args.step == "propose-inputs":
-            try:
-                return await asyncio.wait_for(
-                    InputProposer(llm=llm, source=source).propose(
-                        values["request"], previous
-                    ),
-                    timeout=args.agent_timeout,
-                )
-            except TimeoutError as error:
-                raise RuntimeError(
-                    f"input proposal exceeded the {args.agent_timeout:g}s agent timeout"
-                ) from error
-        if args.step == "review-inputs":
-            contract_review = InputContractCritic(llm=llm).review(values["spec"])
-            if not contract_review.accepted:
-                return contract_review
-            try:
-                return await asyncio.wait_for(
-                    InputCritic(llm=llm, source=source).review(values["spec"]),
-                    timeout=args.agent_timeout,
-                )
-            except TimeoutError as error:
-                raise RuntimeError(
-                    f"input review exceeded the {args.agent_timeout:g}s agent timeout"
-                ) from error
+        if args.step == "validate-request":
+            request = values["request"]
+            TrainingOptimizer._validate_request(request)
+            for name, result in (("preflight", environment.preflight(request.spec)), ("smoke", environment.smoke(request.spec))):
+                if not result.completed:
+                    raise RuntimeError(f"request {name} failed: {result.error}")
+            return request.spec
         if args.step == "smoke":
             return RunResult.model_validate(environment.smoke(values["spec"]))
         if args.step == "benchmark":
@@ -999,12 +961,12 @@ async def _execute(args: argparse.Namespace) -> BaseModel:
             return environment.profile(values["spec"], values["plan"])
         if args.step == "review-trace":
             return TraceCritic(llm=llm).review(values["trace"], REQUIRED_RANGES)
+        if args.step == "create-performance-report":
+            return environment.create_performance_report(
+                values["spec"], values["baseline"], values["plan"], values["trace"]
+            )
         if args.step == "analyze-hotspots":
             return await HotspotAnalyzer(llm=llm).analyze(values["trace"], previous)
-        if args.step == "review-hotspots":
-            return await HotspotCritic(llm=llm).review(
-                values["trace"], values["analysis"]
-            )
         if args.step == "route-hotspot":
             return Router(llm=llm).route(values["hotspot"])
         if args.step == "propose-change":

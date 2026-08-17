@@ -5,7 +5,9 @@ description = "Minimal NOOA training optimizer"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "holistictraceanalysis>=0.5.0",
     "nooa",
+    "pandas<3",
     "pydantic>=2",
     "pyyaml>=6",
 ]
