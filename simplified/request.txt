@@ -1,0 +1,60 @@
+# GeoTransolver volume training-optimizer request (v0 TOML contract).
+# Commands are direct argv and run from the recipe working directory.
+
+objective = "Reduce GeoTransolver volume representative steady-state training-step latency at sampling_resolution=100000 while keeping validation loss within correctness_tolerance."
+allowed_change_paths = ["examples/cfd/external_aerodynamics/unified_external_aero_recipe/src/"]
+
+[spec]
+working_directory = "examples/cfd/external_aerodynamics/unified_external_aero_recipe"
+smoke_command = [
+  "python",
+  "src/train.py",
+  "model=geotransolver_volume",
+  "dataset=drivaer_ml_volume",
+  "profile=false",
+  "compile=false",
+  "precision=bfloat16",
+  "sampling_resolution=100000",
+  "training.seed=42",
+  "training.batch_size=1",
+  "training.num_epochs=1",
+  "run_id=smoke_geotransolver_volume_100k",
+]
+benchmark_command = [
+  "python",
+  "src/train.py",
+  "model=geotransolver_volume",
+  "dataset=drivaer_ml_volume",
+  "profile=false",
+  "+v0_result=true",
+  "compile=true",
+  "precision=bfloat16",
+  "sampling_resolution=100000",
+  "training.seed=42",
+  "training.batch_size=1",
+  "training.num_epochs=1",
+  "run_id=bench_geotransolver_volume_100k",
+]
+profile_command = [
+  "python",
+  "src/train.py",
+  "model=geotransolver_volume",
+  "dataset=drivaer_ml_volume",
+  "profile=true",
+  "+v0_result=true",
+  "compile=true",
+  "precision=bfloat16",
+  "sampling_resolution=100000",
+  "training.seed=42",
+  "training.batch_size=1",
+  "training.num_epochs=1",
+  "run_id=profile_geotransolver_volume_100k",
+]
+correctness_tolerance = 0.0001
+
+# The clean temporary worktree starts from HEAD, where this value may still be
+# unresolved. The overlay supplies the local dataset path without mutating it.
+[[spec.config_overlays]]
+path = "examples/cfd/external_aerodynamics/unified_external_aero_recipe/datasets/dataset_paths.yaml"
+format = "yaml"
+merge = { drivaer_ml = "/mymount/ramu-data/datasets/drivaerml" }

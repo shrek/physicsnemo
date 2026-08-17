@@ -33,10 +33,12 @@ Usage::
     python src/train.py benchmark_io=true +training.benchmark_max_steps=20
 """
 
+import json
 import os
 import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import nullcontext
+from pathlib import Path
 from typing import Any, Literal
 
 import hydra
@@ -48,6 +50,7 @@ from loss import LossCalculator
 from metrics import MetricCalculator, resolve_metrics
 from omegaconf import DictConfig, OmegaConf
 from output_normalize import IOType, normalize_output_to_tensordict, require_output_type
+from v0_results import benchmark_result, trace_result
 from tabulate import tabulate
 from tensordict import TensorDict
 from torch.amp import GradScaler
@@ -1010,6 +1013,16 @@ def launch(cfg: DictConfig) -> None:
     profiler.initialize()
     main(cfg)
     profiler.finalize()
+    if cfg.get("v0_result", False) and DistributedManager().rank == 0:
+        if cfg.profile:
+            result = trace_result(
+                Path("physicsnemo_profiling_outputs") / "torch" / "trace.json"
+            )
+        else:
+            result = benchmark_result(
+                Path(cfg.output_dir) / str(cfg.run_id) / "metrics.jsonl"
+            )
+        print(json.dumps(result), flush=True)
 
 
 if __name__ == "__main__":
