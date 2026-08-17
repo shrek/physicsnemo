@@ -116,25 +116,27 @@ class WorkflowError(RuntimeError):
     """Raised when a user contract or deterministic verifier fails."""
 
 
-class RequestValidationWorkflow:
+class RequestValidationWorkflow(Agent):
     """Validate a complete request and prove its commands can run."""
 
-    def __init__(self, environment: TrainingEnvironment):
-        self.environment = environment
+    agents: Annotated[Agents, hidden]
+
+    def __init__(self, agents: Agents, *, llm: UnifiedLLM):
+        super().__init__(llm=llm)
+        self.agents = agents
 
     def run(self, request: TrainingRequest) -> TrainingSpec:
         self.validate_request(request)
         for name, result in (
-            ("preflight", self.environment.preflight(request.spec)),
-            ("smoke", self.environment.smoke(request.spec)),
+            ("preflight", self.agents.runner.preflight(request.spec)),
+            ("smoke", self.agents.runner.smoke(request.spec)),
         ):
             if not result.completed:
                 raise WorkflowError(f"request {name} failed: {result.error}")
         return request.spec
 
-    @staticmethod
-    def validate_request(request: TrainingRequest) -> None:
-        """Validate the request and run its preflight and smoke checks."""
+    def validate_request(self, request: TrainingRequest) -> None:
+        """Validate the request contract before executing it."""
         if request.spec.unresolved:
             raise WorkflowError("request must not contain unresolved inputs")
         for path in request.allowed_change_paths:
@@ -142,10 +144,13 @@ class RequestValidationWorkflow:
                 raise WorkflowError("allowed_change_paths must be repository-relative")
 
 
-class InstrumentationWorkflow:
+class InstrumentationWorkflow(Agent):
     """Accept profiling instrumentation and capture a validated trace."""
 
-    def __init__(self, agents: Agents, *, max_attempts: int):
+    agents: Annotated[Agents, hidden]
+
+    def __init__(self, agents: Agents, *, llm: UnifiedLLM, max_attempts: int):
+        super().__init__(llm=llm)
         self.agents = agents
         self.max_attempts = max_attempts
 
@@ -164,7 +169,7 @@ class InstrumentationWorkflow:
             )
             if feedback.accepted:
                 return plan
-        TrainingOptimizer.failed("instrumentation", feedback)
+        self.failed("instrumentation", feedback)
         raise AssertionError("unreachable")
 
     async def run(
@@ -176,7 +181,7 @@ class InstrumentationWorkflow:
             plan = await self.agents.instrumentation.propose(
                 request.spec, REQUIRED_RANGES, feedback
             )
-            feedback = TrainingOptimizer.validate_patch_scope(
+            feedback = self.validate_patch_scope(
                 plan.patch, request.allowed_change_paths
             )
             if feedback.accepted:
@@ -189,15 +194,26 @@ class InstrumentationWorkflow:
             feedback = self.agents.trace_critic.review(trace, REQUIRED_RANGES)
             if feedback.accepted:
                 return plan, trace
-        TrainingOptimizer.failed("instrumentation", feedback)
+        self.failed("instrumentation", feedback)
         raise AssertionError("unreachable")
 
+    def validate_patch_scope(
+        self, patch: str, allowed_paths: tuple[str, ...]
+    ) -> Critique:
+        return TrainingOptimizer.validate_patch_scope(patch, allowed_paths)
 
-class PerformanceReportWorkflow:
+    def failed(self, stage: str, critique: Critique | None) -> None:
+        TrainingOptimizer.failed(stage, critique)
+
+
+class PerformanceReportWorkflow(Agent):
     """Create the deterministic HTA-backed performance evidence bundle."""
 
-    def __init__(self, environment: TrainingEnvironment):
-        self.environment = environment
+    agents: Annotated[Agents, hidden]
+
+    def __init__(self, agents: Agents, *, llm: UnifiedLLM):
+        super().__init__(llm=llm)
+        self.agents = agents
 
     def run(
         self,
@@ -206,7 +222,7 @@ class PerformanceReportWorkflow:
         plan: InstrumentationPlan,
         trace: TraceResult,
     ) -> PerformanceReport:
-        report = self.environment.create_performance_report(
+        report = self.agents.runner.create_performance_report(
             spec, baseline, plan, trace
         )
         if not report.completed:
@@ -214,10 +230,13 @@ class PerformanceReportWorkflow:
         return report
 
 
-class HotspotWorkflow:
+class HotspotWorkflow(Agent):
     """Analyze an accepted trace and deterministically choose its first route."""
 
-    def __init__(self, agents: Agents):
+    agents: Annotated[Agents, hidden]
+
+    def __init__(self, agents: Agents, *, llm: UnifiedLLM):
+        super().__init__(llm=llm)
         self.agents = agents
 
     async def analyze(
@@ -226,7 +245,7 @@ class HotspotWorkflow:
         previous: Critique | None = None,
     ) -> HotspotAnalysis:
         analysis = await self.agents.hotspots.analyze(trace, previous)
-        TrainingOptimizer.validate_analysis(trace, analysis)
+        self.validate_analysis(trace, analysis)
         return analysis
 
     async def run(self, trace: TraceResult) -> tuple[Hotspot, Route]:
@@ -234,11 +253,19 @@ class HotspotWorkflow:
         hotspot = analysis.hotspots[0]
         return hotspot, self.agents.router.route(hotspot)
 
+    def validate_analysis(
+        self, trace: TraceResult, analysis: HotspotAnalysis
+    ) -> None:
+        TrainingOptimizer.validate_analysis(trace, analysis)
 
-class CandidateWorkflow:
+
+class CandidateWorkflow(Agent):
     """Propose and benchmark one scoped source optimization."""
 
-    def __init__(self, agents: Agents, *, max_attempts: int):
+    agents: Annotated[Agents, hidden]
+
+    def __init__(self, agents: Agents, *, llm: UnifiedLLM, max_attempts: int):
+        super().__init__(llm=llm)
         self.agents = agents
         self.max_attempts = max_attempts
 
@@ -259,7 +286,7 @@ class CandidateWorkflow:
                 objective=request.objective,
                 allowed_change_paths=request.allowed_change_paths,
             )
-            feedback = TrainingOptimizer.validate_patch_scope(
+            feedback = self.validate_patch_scope(
                 proposal.patch, request.allowed_change_paths
             )
             if not feedback.accepted:
@@ -272,25 +299,36 @@ class CandidateWorkflow:
             )
             if feedback.accepted:
                 return proposal, candidate
-        TrainingOptimizer.failed("candidate", feedback)
+        self.failed("candidate", feedback)
         raise AssertionError("unreachable")
 
+    def validate_patch_scope(
+        self, patch: str, allowed_paths: tuple[str, ...]
+    ) -> Critique:
+        return TrainingOptimizer.validate_patch_scope(patch, allowed_paths)
 
-class PerformanceAnalysisWorkflow:
+    def failed(self, stage: str, critique: Critique | None) -> None:
+        TrainingOptimizer.failed(stage, critique)
+
+
+class PerformanceAnalysisWorkflow(Agent):
     """Build validated baseline, trace, and report evidence for optimization."""
 
-    def __init__(self, agents: Agents, *, max_attempts: int):
+    agents: Annotated[Agents, hidden]
+
+    def __init__(self, agents: Agents, *, llm: UnifiedLLM, max_attempts: int):
+        super().__init__(llm=llm)
         self.agents = agents
         self.max_attempts = max_attempts
 
     async def run(self, request: TrainingRequest) -> PerformanceAnalysis:
-        spec = RequestValidationWorkflow(self.agents.runner.environment).run(request)
+        spec = RequestValidationWorkflow(self.agents, llm=self._llm).run(request)
         baseline = await self.agents.runner.benchmark(spec)
         plan, trace = await InstrumentationWorkflow(
-            self.agents, max_attempts=self.max_attempts
+            self.agents, llm=self._llm, max_attempts=self.max_attempts
         ).run(request)
         performance_report = PerformanceReportWorkflow(
-            self.agents.runner.environment
+            self.agents, llm=self._llm
         ).run(spec, baseline, plan, trace)
         return PerformanceAnalysis(
             request=request,
@@ -301,19 +339,24 @@ class PerformanceAnalysisWorkflow:
         )
 
 
-class PerformanceOptimizationWorkflow:
+class PerformanceOptimizationWorkflow(Agent):
     """Evaluate one scoped source optimization from validated performance evidence."""
 
-    def __init__(self, agents: Agents, *, max_attempts: int):
+    agents: Annotated[Agents, hidden]
+
+    def __init__(self, agents: Agents, *, llm: UnifiedLLM, max_attempts: int):
+        super().__init__(llm=llm)
         self.agents = agents
         self.max_attempts = max_attempts
 
     async def run(self, analysis: PerformanceAnalysis) -> OptimizationResult:
         if not analysis.performance_report.completed:
             raise WorkflowError("performance analysis report is incomplete")
-        hotspot, route = await HotspotWorkflow(self.agents).run(analysis.trace)
+        hotspot, route = await HotspotWorkflow(self.agents, llm=self._llm).run(
+            analysis.trace
+        )
         proposal, candidate = await CandidateWorkflow(
-            self.agents, max_attempts=self.max_attempts
+            self.agents, llm=self._llm, max_attempts=self.max_attempts
         ).run(analysis.request, analysis.baseline, hotspot, route)
         if candidate.benchmark is None:
             raise WorkflowError("accepted candidate has no benchmark")
@@ -346,13 +389,20 @@ class TrainingOptimizer(Agent):
     async def run(self, request: TrainingRequest) -> OptimizationResult:
         """Run performance analysis, then optimize from its evidence artifact."""
         analysis = await PerformanceAnalysisWorkflow(
-            self.agents, max_attempts=self.max_attempts
+            self.agents, llm=self._llm, max_attempts=self.max_attempts
         ).run(request)
         return await PerformanceOptimizationWorkflow(
-            self.agents, max_attempts=self.max_attempts
+            self.agents, llm=self._llm, max_attempts=self.max_attempts
         ).run(analysis)
 
-    _validate_request = staticmethod(RequestValidationWorkflow.validate_request)
+    @staticmethod
+    def _validate_request(request: TrainingRequest) -> None:
+        """Backward-compatible pure request-contract validator."""
+        if request.spec.unresolved:
+            raise WorkflowError("request must not contain unresolved inputs")
+        for path in request.allowed_change_paths:
+            if path.startswith("/") or ".." in path.split("/"):
+                raise WorkflowError("allowed_change_paths must be repository-relative")
 
     @staticmethod
     def validate_patch_scope(patch: str, allowed_paths: tuple[str, ...]) -> Critique:
@@ -401,27 +451,38 @@ class TrainingOptimizer(Agent):
     _failed = staticmethod(failed)
 
 
-@dataclass(frozen=True)
-class WorkflowSteps:
+class WorkflowSteps(Agent):
     """Individually invocable workflow stages over shared dependencies."""
 
-    source: SourceEnvironment
-    environment: TrainingEnvironment
-    llm: UnifiedLLM
-    max_attempts: int = 3
+    source: Annotated[SourceEnvironment, hidden]
+    environment: Annotated[TrainingEnvironment, hidden]
+
+    def __init__(
+        self,
+        source: SourceEnvironment,
+        environment: TrainingEnvironment,
+        llm: UnifiedLLM,
+        max_attempts: int = 3,
+    ):
+        super().__init__(llm=llm)
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
+        self.source = source
+        self.environment = environment
+        self.max_attempts = max_attempts
 
     @property
     def agents(self) -> Agents:
-        return create_agents(self.llm, self.source, self.environment)
+        return create_agents(self._llm, self.source, self.environment)
 
     async def hello(self, name: str) -> HelloResponse:
         """Generate a greeting from the configured LLM."""
-        return HelloResponse.model_validate(await HelloAgent(llm=self.llm).hello(name))
+        return HelloResponse.model_validate(await HelloAgent(llm=self._llm).hello(name))
 
     async def run_all(self, request: TrainingRequest) -> OptimizationResult:
         """Execute the complete optimization pipeline."""
         return await TrainingOptimizer(
-            self.agents, llm=self.llm, max_attempts=self.max_attempts
+            self.agents, llm=self._llm, max_attempts=self.max_attempts
         ).run(request)
 
     async def analyze_performance(
@@ -429,7 +490,7 @@ class WorkflowSteps:
     ) -> PerformanceAnalysis:
         """Build validated performance evidence through the report boundary."""
         return await PerformanceAnalysisWorkflow(
-            self.agents, max_attempts=self.max_attempts
+            self.agents, llm=self._llm, max_attempts=self.max_attempts
         ).run(request)
 
     async def optimize_performance(
@@ -437,16 +498,16 @@ class WorkflowSteps:
     ) -> OptimizationResult:
         """Evaluate one optimization from a completed performance analysis."""
         return await PerformanceOptimizationWorkflow(
-            self.agents, max_attempts=self.max_attempts
+            self.agents, llm=self._llm, max_attempts=self.max_attempts
         ).run(analysis)
 
     def validate_request(self, request: TrainingRequest) -> TrainingSpec:
         """Validate the request and run its preflight and smoke checks."""
-        return RequestValidationWorkflow(self.environment).run(request)
+        return RequestValidationWorkflow(self.agents, llm=self._llm).run(request)
 
     def smoke(self, spec: TrainingSpec) -> RunResult:
         """Run the configured bounded training smoke command."""
-        return self.environment.smoke(spec)
+        return self.agents.runner.smoke(spec)
 
     async def benchmark(self, spec: TrainingSpec) -> BenchmarkResult:
         """Run the unmodified benchmark command and parse its metrics."""
@@ -457,7 +518,7 @@ class WorkflowSteps:
     ) -> InstrumentationPlan:
         """Propose and validate profiling instrumentation."""
         return await InstrumentationWorkflow(
-            self.agents, max_attempts=self.max_attempts
+            self.agents, llm=self._llm, max_attempts=self.max_attempts
         ).accept(spec, previous)
 
     def review_instrumentation(
@@ -468,7 +529,7 @@ class WorkflowSteps:
 
     def profile(self, spec: TrainingSpec, plan: InstrumentationPlan) -> TraceResult:
         """Apply accepted instrumentation and capture a trace."""
-        return self.environment.profile(spec, plan)
+        return self.agents.runner.profile(spec, plan)
 
     def review_trace(self, trace: TraceResult) -> Critique:
         """Deterministically validate a captured trace."""
@@ -482,7 +543,7 @@ class WorkflowSteps:
         trace: TraceResult,
     ) -> PerformanceReport:
         """Create the deterministic phase-one HTA evidence bundle."""
-        return self.environment.create_performance_report(
+        return self.agents.runner.create_performance_report(
             spec, baseline, plan, trace
         )
 
