@@ -1,4 +1,4 @@
-"""NOOA trace wiring for optimizer runs and the step CLI."""
+"""NOOA trace wiring for optimizer runs and the workflow command."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def trace_for_cli(
     color: ColorMode = "auto",
     turn_detail: TurnDetail = "compact",
 ) -> None:
-    """Configure file and/or concise live tracing for ``simplified-step``."""
+    """Configure file and/or concise live tracing for the ``workflow`` workflow command."""
     configured: list[SpanExporter] = []
     if directory is not None:
         configured.append(exporters.jsonl(directory))

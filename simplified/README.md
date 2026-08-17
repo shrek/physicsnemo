@@ -31,12 +31,12 @@ These follow the [NOOA object-oriented agent model](https://arxiv.org/pdf/2607.2
   and every loop has a hard attempt limit.
 - **Authority follows capability.** Proposal agents receive only read-only source
   methods. The injected training environment owns execution and candidate isolation.
-- **DRY and YAGNI.** There is one workflow, one environment boundary, no YAML/DAG
+- **DRY and YAGNI.** Workflow stages share one environment boundary; there is no YAML/DAG
   engine, persistence layer, generic retry framework, or speculative extension API.
 
 The implementation lives in `simplified`: `types.py` defines values,
 `environment.py` defines external capabilities, `agents.py` defines nodes, and
-`workflow.py` orders them.
+`workflow.py` composes those stages and exposes each one for direct invocation.
 
 ```python
 agents = create_agents(llm, source_environment, training_environment)
@@ -77,7 +77,7 @@ export SIMPLIFIED_MODEL="openai/nvidia/moonshotai/kimi-k3-max-preview"
 export SIMPLIFIED_API_BASE="https://inference-api.nvidia.com/v1"
 export SIMPLIFIED_API_TOKEN="$INFERENCE_HUB_KEY"
 
-uv run simplified-step hello --name PhysicsNeMo -o hello.json
+uv run workflow hello --name PhysicsNeMo -o hello.json
 cat hello.json
 ```
 
@@ -94,7 +94,7 @@ export SIMPLIFIED_API_BASE="https://your-gateway.example/v1"
 export SIMPLIFIED_API_KEY="$SWITCHYARD_API_KEY"
 export SIMPLIFIED_CLIENT_TYPE="responses"
 
-uv run simplified-step hello --name PhysicsNeMo -o hello.json
+uv run workflow hello --name PhysicsNeMo -o hello.json
 ```
 
 The equivalent one-command override is `--client-type responses`. When neither
@@ -126,23 +126,23 @@ standalone environment, then run a step with either request format:
 
 ```bash
 uv sync
-uv run simplified-step accept-inputs request.txt \
+uv run workflow accept-inputs request.txt \
   --repo /path/to/training/repo --human-in-the-loop -o spec.json
 
 # Lower-level proposal and review steps remain available for debugging.
-uv run simplified-step propose-inputs request.txt \
+uv run workflow propose-inputs request.txt \
   --repo /path/to/training/repo -o spec.json
-uv run simplified-step review-inputs spec.json -o input-critique.json
+uv run workflow review-inputs spec.json -o input-critique.json
 
-uv run simplified-step smoke spec.json --repo /path/to/training/repo -o smoke.json
-uv run simplified-step benchmark spec.json --repo /path/to/training/repo -o baseline.json
-uv run simplified-step propose-instrumentation spec.json \
+uv run workflow smoke spec.json --repo /path/to/training/repo -o smoke.json
+uv run workflow benchmark spec.json --repo /path/to/training/repo -o baseline.json
+uv run workflow propose-instrumentation spec.json \
   --repo /path/to/training/repo -o instrumentation-plan.json
-uv run simplified-step review-instrumentation spec.json instrumentation-plan.json \
+uv run workflow review-instrumentation spec.json instrumentation-plan.json \
   --repo /path/to/training/repo -o instrumentation-critique.json
-uv run simplified-step profile spec.json instrumentation-plan.json \
+uv run workflow profile spec.json instrumentation-plan.json \
   --repo /path/to/training/repo -o trace.json
-uv run simplified-step run-all request.txt \
+uv run workflow run-all request.txt \
   --repo /path/to/training/repo --human-in-the-loop -o result.json
 ```
 
@@ -195,7 +195,7 @@ from that directory. For the GeoTransolver unified external-aero recipe, use:
 After `accept-inputs` succeeds, its smoke test has passed. The next required step is
 `benchmark`; the standalone `smoke` command remains useful for diagnostics.
 
-Run `uv run simplified-step --help` for every step and its input order. LLM steps
+Run `uv run workflow --help` for every step and its input order. LLM steps
 require `--model` or `SIMPLIFIED_MODEL`. Complete NOOA traces are written to
 `./traces` by default; use `--trace-dir PATH` to select another directory or
 `--no-trace` to disable persistent tracing. `--previous critique.json` supplies
@@ -236,7 +236,7 @@ use `--color always` or `--color never` to override detection. Live and file tra
 can be enabled together:
 
 ```bash
-uv run simplified-step accept-inputs request.txt --human-in-the-loop \
+uv run workflow accept-inputs request.txt --human-in-the-loop \
   --repo /path/to/training/repo --show-turns \
   -o spec.json
 ```
@@ -262,20 +262,3 @@ Python file without running the expensive training workload. The subsequent
 `profile` step is the runtime test: it executes the patched command, and the trace
 critic verifies successful output, the trace path, summary, and required ranges.
 created in the worktree are copied to `--artifacts` before cleanup.
-
-The normal functional tests use real local processes but no external LLM:
-
-```bash
-uv run pytest
-```
-
-Set a model only when intentionally running the independently selectable real-LLM
-tests:
-
-```bash
-uv run pytest -m llm -s
-uv run pytest tests/test_steps.py::test_llm_hello -s
-
-SIMPLIFIED_TEST_MODEL=another-model \
-  uv run pytest tests/test_steps.py::test_llm_analyze_hotspots -s
-```
