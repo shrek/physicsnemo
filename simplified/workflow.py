@@ -20,16 +20,7 @@ from pydantic import BaseModel
 from simplified.agents import (
     REQUIRED_RANGES,
     Agents,
-    CandidateCritic,
-    ChangeProposer,
     HelloAgent,
-    HotspotAnalyzer,
-    InstrumentationAcceptanceAgent,
-    InstrumentationCritic,
-    InstrumentationProposer,
-    ReportBuilder,
-    Router,
-    TraceCritic,
     create_agents,
 )
 from simplified.environment import (
@@ -90,9 +81,8 @@ class RequestValidationWorkflow:
 class InstrumentationWorkflow:
     """Accept profiling instrumentation and capture a validated trace."""
 
-    def __init__(self, agents: Agents, llm: UnifiedLLM, *, max_attempts: int):
+    def __init__(self, agents: Agents, *, max_attempts: int):
         self.agents = agents
-        self.llm = llm
         self.max_attempts = max_attempts
 
     async def accept(
@@ -100,12 +90,18 @@ class InstrumentationWorkflow:
         spec: TrainingSpec,
         previous: Critique | None = None,
     ) -> InstrumentationPlan:
-        return await InstrumentationAcceptanceAgent(
-            llm=self.llm,
-            proposer=self.agents.instrumentation,
-            critic=self.agents.instrumentation_critic,
-            max_attempts=self.max_attempts,
-        ).accept(spec, REQUIRED_RANGES, previous)
+        feedback = previous
+        for _ in range(self.max_attempts):
+            plan = await self.agents.instrumentation.propose(
+                spec, REQUIRED_RANGES, feedback
+            )
+            feedback = self.agents.instrumentation_critic.review(
+                spec, plan, REQUIRED_RANGES
+            )
+            if feedback.accepted:
+                return plan
+        TrainingOptimizer.failed("instrumentation", feedback)
+        raise AssertionError("unreachable")
 
     async def run(
         self,
@@ -239,7 +235,7 @@ class TrainingOptimizer(Agent):
         spec = RequestValidationWorkflow(self.agents.runner.environment).run(request)
         baseline = await self.agents.runner.benchmark(spec)
         plan, trace = await InstrumentationWorkflow(
-            self.agents, self.llm, max_attempts=self.max_attempts
+            self.agents, max_attempts=self.max_attempts
         ).run(request)
         phase1_report = PerformanceReportWorkflow(
             self.agents.runner.environment
@@ -344,7 +340,7 @@ class WorkflowSteps:
     ) -> InstrumentationPlan:
         """Propose and validate profiling instrumentation."""
         return await InstrumentationWorkflow(
-            self.agents, self.llm, max_attempts=self.max_attempts
+            self.agents, max_attempts=self.max_attempts
         ).accept(spec, previous)
 
     def review_instrumentation(
