@@ -17,14 +17,14 @@ from uuid import uuid4
 
 import yaml
 
-from simplified.performance_report import create_phase1_report
+from simplified.performance_report import create_performance_report
 from simplified.types import (
     BenchmarkLog,
     BenchmarkResult,
     CandidateResult,
     ChangeProposal,
     InstrumentationPlan,
-    Phase1Report,
+    PerformanceReport,
     RunResult,
     TraceResult,
     TrainingSpec,
@@ -70,7 +70,7 @@ class TrainingEnvironment(InputValidationEnvironment, Protocol):
         baseline: BenchmarkResult,
         plan: InstrumentationPlan,
         trace: TraceResult,
-    ) -> Phase1Report: ...
+    ) -> PerformanceReport: ...
 
     def benchmark_candidate(
         self, spec: TrainingSpec, proposal: ChangeProposal
@@ -484,9 +484,9 @@ class LocalTrainingEnvironment:
         baseline: BenchmarkResult,
         plan: InstrumentationPlan,
         trace: TraceResult,
-    ) -> Phase1Report:
+    ) -> PerformanceReport:
         """Create the deterministic HTA-backed phase-1 analysis bundle."""
-        return create_phase1_report(
+        return create_performance_report(
             root=self.root,
             artifact_directory=self.artifact_directory,
             spec=spec,

@@ -40,7 +40,7 @@ from simplified.types import (
     InstrumentationPlan,
     OptimizationResult,
     PerformanceAnalysis,
-    Phase1Report,
+    PerformanceReport,
     Route,
     RunResult,
     TraceResult,
@@ -142,7 +142,7 @@ class PerformanceReportWorkflow:
         baseline: BenchmarkResult,
         plan: InstrumentationPlan,
         trace: TraceResult,
-    ) -> Phase1Report:
+    ) -> PerformanceReport:
         report = self.environment.create_performance_report(
             spec, baseline, plan, trace
         )
@@ -258,7 +258,7 @@ class PerformanceOptimizationWorkflow:
             analysis.baseline, candidate.benchmark, hotspot, proposal
         )
         return result.model_copy(
-            update={"phase1_report": analysis.performance_report}
+            update={"performance_report": analysis.performance_report}
         )
 
 
@@ -417,7 +417,7 @@ class WorkflowSteps:
         baseline: BenchmarkResult,
         plan: InstrumentationPlan,
         trace: TraceResult,
-    ) -> Phase1Report:
+    ) -> PerformanceReport:
         """Create the deterministic phase-one HTA evidence bundle."""
         return self.environment.create_performance_report(
             spec, baseline, plan, trace

@@ -31,7 +31,7 @@ from simplified.types import (
     HotspotAnalysis,
     InstrumentationPlan,
     OptimizationResult,
-    Phase1Report,
+    PerformanceReport,
     Route,
     RunResult,
     TraceResult,
@@ -464,7 +464,7 @@ class Runner(Agent):
         baseline: BenchmarkResult,
         plan: InstrumentationPlan,
         trace: TraceResult,
-    ) -> Phase1Report:
+    ) -> PerformanceReport:
         return self.environment.create_performance_report(spec, baseline, plan, trace)
 
     async def benchmark_candidate(

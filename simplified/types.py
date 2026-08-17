@@ -109,7 +109,7 @@ class TraceResult(Value):
     error: str = Field(default="", description="Failure explanation when completed is false.")
 
 
-class Phase1Report(Value):
+class PerformanceReport(Value):
     """Typed location and status of a deterministic HTA phase-1 report bundle."""
 
     completed: bool
@@ -128,7 +128,7 @@ class PerformanceAnalysis(Value):
     baseline: BenchmarkResult
     instrumentation: InstrumentationPlan
     trace: TraceResult
-    performance_report: Phase1Report
+    performance_report: PerformanceReport
 
 
 HotspotKind = Literal[
@@ -174,4 +174,4 @@ class OptimizationResult(Value):
     proposal: ChangeProposal
     speedup: float
     report: str
-    phase1_report: Phase1Report | None = None
+    performance_report: PerformanceReport | None = None
