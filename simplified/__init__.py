@@ -9,11 +9,13 @@ from simplified.observability import (
     trace_to_files,
     trace_to_viewer,
 )
-from simplified.types import HelloResponse, TrainingRequest
+from simplified.types import HelloResponse, PerformanceAnalysis, TrainingRequest
 from simplified.workflow import (
     CandidateWorkflow,
     HotspotWorkflow,
     InstrumentationWorkflow,
+    PerformanceAnalysisWorkflow,
+    PerformanceOptimizationWorkflow,
     PerformanceReportWorkflow,
     RequestValidationWorkflow,
     TrainingOptimizer,
@@ -25,10 +27,13 @@ __all__ = [
     "Agents",
     "HelloAgent",
     "HelloResponse",
+    "PerformanceAnalysis",
     "ObservedRun",
     "CandidateWorkflow",
     "HotspotWorkflow",
     "InstrumentationWorkflow",
+    "PerformanceAnalysisWorkflow",
+    "PerformanceOptimizationWorkflow",
     "PerformanceReportWorkflow",
     "RequestValidationWorkflow",
     "TrainingOptimizer",

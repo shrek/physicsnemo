@@ -121,6 +121,16 @@ class Phase1Report(Value):
     error: str = ""
 
 
+class PerformanceAnalysis(Value):
+    """Validated evidence bundle handed from analysis to optimization."""
+
+    request: TrainingRequest
+    baseline: BenchmarkResult
+    instrumentation: InstrumentationPlan
+    trace: TraceResult
+    performance_report: Phase1Report
+
+
 HotspotKind = Literal[
     "dataloader_wait",
     "python_preprocessing",

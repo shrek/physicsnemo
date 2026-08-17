@@ -39,6 +39,7 @@ from simplified.types import (
     HotspotAnalysis,
     InstrumentationPlan,
     OptimizationResult,
+    PerformanceAnalysis,
     Phase1Report,
     Route,
     RunResult,
@@ -130,7 +131,7 @@ class InstrumentationWorkflow:
 
 
 class PerformanceReportWorkflow:
-    """Create the deterministic phase-one HTA evidence bundle."""
+    """Create the deterministic HTA-backed performance evidence bundle."""
 
     def __init__(self, environment: TrainingEnvironment):
         self.environment = environment
@@ -146,7 +147,7 @@ class PerformanceReportWorkflow:
             spec, baseline, plan, trace
         )
         if not report.completed:
-            raise WorkflowError("phase-1 performance report failed: " + report.error)
+            raise WorkflowError("performance report failed: " + report.error)
         return report
 
 
@@ -174,9 +175,8 @@ class HotspotWorkflow:
 class CandidateWorkflow:
     """Propose and benchmark one scoped source optimization."""
 
-    def __init__(self, agents: Agents, llm: UnifiedLLM, *, max_attempts: int):
+    def __init__(self, agents: Agents, *, max_attempts: int):
         self.agents = agents
-        self.llm = llm
         self.max_attempts = max_attempts
 
     async def run(
@@ -213,6 +213,55 @@ class CandidateWorkflow:
         raise AssertionError("unreachable")
 
 
+class PerformanceAnalysisWorkflow:
+    """Build validated baseline, trace, and report evidence for optimization."""
+
+    def __init__(self, agents: Agents, *, max_attempts: int):
+        self.agents = agents
+        self.max_attempts = max_attempts
+
+    async def run(self, request: TrainingRequest) -> PerformanceAnalysis:
+        spec = RequestValidationWorkflow(self.agents.runner.environment).run(request)
+        baseline = await self.agents.runner.benchmark(spec)
+        plan, trace = await InstrumentationWorkflow(
+            self.agents, max_attempts=self.max_attempts
+        ).run(request)
+        performance_report = PerformanceReportWorkflow(
+            self.agents.runner.environment
+        ).run(spec, baseline, plan, trace)
+        return PerformanceAnalysis(
+            request=request,
+            baseline=baseline,
+            instrumentation=plan,
+            trace=trace,
+            performance_report=performance_report,
+        )
+
+
+class PerformanceOptimizationWorkflow:
+    """Evaluate one scoped source optimization from validated performance evidence."""
+
+    def __init__(self, agents: Agents, *, max_attempts: int):
+        self.agents = agents
+        self.max_attempts = max_attempts
+
+    async def run(self, analysis: PerformanceAnalysis) -> OptimizationResult:
+        if not analysis.performance_report.completed:
+            raise WorkflowError("performance analysis report is incomplete")
+        hotspot, route = await HotspotWorkflow(self.agents).run(analysis.trace)
+        proposal, candidate = await CandidateWorkflow(
+            self.agents, max_attempts=self.max_attempts
+        ).run(analysis.request, analysis.baseline, hotspot, route)
+        if candidate.benchmark is None:
+            raise WorkflowError("accepted candidate has no benchmark")
+        result = self.agents.report.build(
+            analysis.baseline, candidate.benchmark, hotspot, proposal
+        )
+        return result.model_copy(
+            update={"phase1_report": analysis.performance_report}
+        )
+
+
 class TrainingOptimizer(Agent):
     """Compose the independently invocable optimization workflows."""
 
@@ -232,24 +281,13 @@ class TrainingOptimizer(Agent):
         self.max_attempts = max_attempts
 
     async def run(self, request: TrainingRequest) -> OptimizationResult:
-        spec = RequestValidationWorkflow(self.agents.runner.environment).run(request)
-        baseline = await self.agents.runner.benchmark(spec)
-        plan, trace = await InstrumentationWorkflow(
+        """Run performance analysis, then optimize from its evidence artifact."""
+        analysis = await PerformanceAnalysisWorkflow(
             self.agents, max_attempts=self.max_attempts
         ).run(request)
-        phase1_report = PerformanceReportWorkflow(
-            self.agents.runner.environment
-        ).run(spec, baseline, plan, trace)
-        hotspot, route = await HotspotWorkflow(self.agents).run(trace)
-        proposal, candidate = await CandidateWorkflow(
+        return await PerformanceOptimizationWorkflow(
             self.agents, max_attempts=self.max_attempts
-        ).run(request, baseline, hotspot, route)
-        if candidate.benchmark is None:
-            raise WorkflowError("accepted candidate has no benchmark")
-        result = self.agents.report.build(
-            baseline, candidate.benchmark, hotspot, proposal
-        )
-        return result.model_copy(update={"phase1_report": phase1_report})
+        ).run(analysis)
 
     _validate_request = staticmethod(RequestValidationWorkflow.validate_request)
 
@@ -322,6 +360,22 @@ class WorkflowSteps:
         return await TrainingOptimizer(
             self.agents, llm=self.llm, max_attempts=self.max_attempts
         ).run(request)
+
+    async def analyze_performance(
+        self, request: TrainingRequest
+    ) -> PerformanceAnalysis:
+        """Build validated performance evidence through the report boundary."""
+        return await PerformanceAnalysisWorkflow(
+            self.agents, max_attempts=self.max_attempts
+        ).run(request)
+
+    async def optimize_performance(
+        self, analysis: PerformanceAnalysis
+    ) -> OptimizationResult:
+        """Evaluate one optimization from a completed performance analysis."""
+        return await PerformanceOptimizationWorkflow(
+            self.agents, max_attempts=self.max_attempts
+        ).run(analysis)
 
     def validate_request(self, request: TrainingRequest) -> TrainingSpec:
         """Validate the request and run its preflight and smoke checks."""
@@ -422,6 +476,8 @@ InputContract = tuple[tuple[str, type[BaseModel]], ...]
 INPUTS: dict[str, InputContract] = {
     "hello": (),
     "run-all": (("request", TrainingRequest),),
+    "analyze-performance": (("request", TrainingRequest),),
+    "optimize-performance": (("analysis", PerformanceAnalysis),),
     "validate-request": (("request", TrainingRequest),),
     "smoke": (("spec", TrainingSpec),),
     "benchmark": (("spec", TrainingSpec),),
@@ -459,6 +515,8 @@ INPUTS: dict[str, InputContract] = {
 LLM_STEPS = {
     "hello",
     "run-all",
+    "analyze-performance",
+    "optimize-performance",
     "propose-instrumentation",
     "analyze-hotspots",
     "propose-change",
@@ -602,6 +660,12 @@ async def execute(args: argparse.Namespace) -> BaseModel:
         handlers: dict[str, Callable[[], Awaitable[BaseModel] | BaseModel]] = {
             "hello": lambda: steps.hello(args.name),
             "run-all": lambda: steps.run_all(values["request"]),
+            "analyze-performance": lambda: steps.analyze_performance(
+                values["request"]
+            ),
+            "optimize-performance": lambda: steps.optimize_performance(
+                values["analysis"]
+            ),
             "validate-request": lambda: steps.validate_request(values["request"]),
             "smoke": lambda: steps.smoke(values["spec"]),
             "benchmark": lambda: steps.benchmark(values["spec"]),
