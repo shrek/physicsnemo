@@ -1,0 +1,17 @@
+[
+  {
+    "kernel_type": "COMPUTATION",
+    "percentage": 97.6,
+    "sum": 5200583
+  },
+  {
+    "kernel_type": "MEMORY",
+    "percentage": 2.4,
+    "sum": 130256
+  },
+  {
+    "kernel_type": "COMPUTATION overlapping MEMORY",
+    "percentage": 0.0,
+    "sum": 61
+  }
+]

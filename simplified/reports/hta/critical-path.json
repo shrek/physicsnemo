@@ -1,0 +1,13 @@
+{
+  "annotation": "ProfilerStep",
+  "breakdown_rows": 0,
+  "cuda_synchronization_events": false,
+  "graph_archive": "",
+  "instance_id": 1,
+  "limitation": "Trace lacks CUDA synchronization events; HTA reports that critical-path attribution may be inaccurate.",
+  "rank": 0,
+  "reason": "HTA did not produce a critical-path graph for the selected ProfilerStep boundary.",
+  "selected_step": "ProfilerStep#3",
+  "status": "unavailable",
+  "summary": {}
+}

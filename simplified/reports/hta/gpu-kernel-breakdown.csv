@@ -1,0 +1,4 @@
+kernel_type,sum,percentage
+COMPUTATION,5200583,97.6
+MEMORY,130256,2.4
+COMPUTATION overlapping MEMORY,61,0.0

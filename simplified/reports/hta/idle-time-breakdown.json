@@ -1,0 +1,51 @@
+[
+  {
+    "idle_category": "host_wait",
+    "idle_time": 21213988.0,
+    "idle_time_ratio": 1.0,
+    "rank": 0,
+    "stream": 7
+  },
+  {
+    "idle_category": "kernel_wait",
+    "idle_time": 97965.0,
+    "idle_time_ratio": 0.0,
+    "rank": 0,
+    "stream": 7
+  },
+  {
+    "idle_category": "other",
+    "idle_time": 279.0,
+    "idle_time_ratio": 0.0,
+    "rank": 0,
+    "stream": 7
+  },
+  {
+    "idle_category": "host_wait",
+    "idle_time": 12.0,
+    "idle_time_ratio": 1.0,
+    "rank": 0,
+    "stream": 15
+  },
+  {
+    "idle_category": "other",
+    "idle_time": 0.0,
+    "idle_time_ratio": 0.0,
+    "rank": 0,
+    "stream": 15
+  },
+  {
+    "idle_category": "host_wait",
+    "idle_time": 9.0,
+    "idle_time_ratio": 1.0,
+    "rank": 0,
+    "stream": 31
+  },
+  {
+    "idle_category": "other",
+    "idle_time": 0.0,
+    "idle_time_ratio": 0.0,
+    "rank": 0,
+    "stream": 31
+  }
+]

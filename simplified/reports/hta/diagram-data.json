@@ -1,0 +1,1481 @@
+{
+  "forward": {
+    "steps": [
+      {
+        "duration_ms": 134.776662109375,
+        "kernels": [
+          {
+            "category": "triton",
+            "end_ms": 7.09886962890625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_addmm_view_27",
+            "start_ms": 7.0957978515625
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.12875830078125,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.1256220703125
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.14722216796875,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.1440859375
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.17157421875,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.16847021484375
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.19022998046875,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.186998046875
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.20552587890625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.2024541015625
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.22014990234375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.217173828125
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.2351259765625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.23189404296875
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.2497822265625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.24651806640625
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.265173828125,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.262005859375
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.28018212890625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.2772060546875
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.29467822265625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.29147802734375
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.309494140625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.30658203125
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.3240849609375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.32110986328125
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.351990234375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.34888525390625
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.36763818359375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.36456494140625
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.383509765625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.38043798828125
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.3988369140625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.39573388671875
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.41419677734375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.411125
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.42927001953125,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.4261328125
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.44514111328125,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.44191015625
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.4605009765625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.45755712890625
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.47650146484375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.47330126953125
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.4923408203125,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.489044921875
+          },
+          {
+            "category": "triton",
+            "end_ms": 7.50683740234375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_28",
+            "start_ms": 7.503701171875
+          },
+          {
+            "category": "other",
+            "end_ms": 7.8915400390625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortHistogramKernel<cub::CUB_2008",
+            "start_ms": 7.88859716796875
+          },
+          {
+            "category": "other",
+            "end_ms": 7.91998779296875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 7.9093330078125
+          },
+          {
+            "category": "other",
+            "end_ms": 7.933908203125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 7.92322021484375
+          },
+          {
+            "category": "other",
+            "end_ms": 7.9472841796875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 7.93739599609375
+          },
+          {
+            "category": "other",
+            "end_ms": 7.95810009765625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 7.950453125
+          },
+          {
+            "category": "other",
+            "end_ms": 8.14584423828125,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 8.14238818359375
+          },
+          {
+            "category": "other",
+            "end_ms": 9.61822509765625,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 8.24389208984375
+          },
+          {
+            "category": "triton",
+            "end_ms": 9.62580859375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_29",
+            "start_ms": 9.6214248046875
+          },
+          {
+            "category": "other",
+            "end_ms": 9.63604931640625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 9.62705712890625
+          },
+          {
+            "category": "triton",
+            "end_ms": 9.64260888671875,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 9.63710498046875
+          },
+          {
+            "category": "other",
+            "end_ms": 9.6496171875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 9.64388916015625
+          },
+          {
+            "category": "triton",
+            "end_ms": 9.65480126953125,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 9.65064111328125
+          },
+          {
+            "category": "other",
+            "end_ms": 9.6623212890625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 9.65588916015625
+          },
+          {
+            "category": "triton",
+            "end_ms": 9.66811328125,
+            "family": "triton",
+            "label": "triton_poi_fused_tanh_view_32",
+            "start_ms": 9.664369140625
+          },
+          {
+            "category": "other",
+            "end_ms": 9.704369140625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 9.6937451171875
+          },
+          {
+            "category": "other",
+            "end_ms": 9.71905712890625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 9.70827294921875
+          },
+          {
+            "category": "other",
+            "end_ms": 9.7330732421875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 9.72328125
+          },
+          {
+            "category": "other",
+            "end_ms": 9.74392138671875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 9.7362412109375
+          },
+          {
+            "category": "other",
+            "end_ms": 9.87643310546875,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 9.8728798828125
+          },
+          {
+            "category": "other",
+            "end_ms": 11.23991796875,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 9.93947216796875
+          },
+          {
+            "category": "triton",
+            "end_ms": 11.246541015625,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_29",
+            "start_ms": 11.24225390625
+          },
+          {
+            "category": "other",
+            "end_ms": 11.25556494140625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 11.2475341796875
+          },
+          {
+            "category": "triton",
+            "end_ms": 11.262125,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 11.25662109375
+          },
+          {
+            "category": "other",
+            "end_ms": 11.2692607421875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 11.2635009765625
+          },
+          {
+            "category": "triton",
+            "end_ms": 11.27451025390625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 11.27035009765625
+          },
+          {
+            "category": "other",
+            "end_ms": 11.2833408203125,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 11.2768779296875
+          },
+          {
+            "category": "other",
+            "end_ms": 11.3199169921875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 11.30939013671875
+          },
+          {
+            "category": "other",
+            "end_ms": 11.33377294921875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 11.3235009765625
+          },
+          {
+            "category": "other",
+            "end_ms": 11.347533203125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 11.33809326171875
+          },
+          {
+            "category": "other",
+            "end_ms": 11.35834912109375,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 11.35063720703125
+          },
+          {
+            "category": "other",
+            "end_ms": 11.49006103515625,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 11.483212890625
+          },
+          {
+            "category": "other",
+            "end_ms": 14.11530419921875,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 11.54650927734375
+          },
+          {
+            "category": "triton",
+            "end_ms": 14.124263671875,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_33",
+            "start_ms": 14.11773583984375
+          },
+          {
+            "category": "other",
+            "end_ms": 14.13239208984375,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 14.1257041015625
+          },
+          {
+            "category": "triton",
+            "end_ms": 14.13888818359375,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 14.13335205078125
+          },
+          {
+            "category": "other",
+            "end_ms": 14.1458642578125,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 14.1402001953125
+          },
+          {
+            "category": "triton",
+            "end_ms": 14.15111181640625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 14.14685498046875
+          },
+          {
+            "category": "other",
+            "end_ms": 14.1586318359375,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 14.15223193359375
+          },
+          {
+            "category": "triton",
+            "end_ms": 14.16343212890625,
+            "family": "triton",
+            "label": "triton_poi_fused_tanh_view_32",
+            "start_ms": 14.15972021484375
+          },
+          {
+            "category": "other",
+            "end_ms": 14.1842001953125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortHistogramKernel<cub::CUB_2008",
+            "start_ms": 14.1812880859375
+          },
+          {
+            "category": "other",
+            "end_ms": 14.20096826171875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 14.19053515625
+          },
+          {
+            "category": "other",
+            "end_ms": 14.21485498046875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 14.204583984375
+          },
+          {
+            "category": "other",
+            "end_ms": 14.2277841796875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 14.21831103515625
+          },
+          {
+            "category": "other",
+            "end_ms": 14.239623046875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 14.2318798828125
+          },
+          {
+            "category": "other",
+            "end_ms": 14.3725830078125,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 14.36560693359375
+          },
+          {
+            "category": "other",
+            "end_ms": 17.0234580078125,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 14.42627880859375
+          },
+          {
+            "category": "triton",
+            "end_ms": 17.03309033203125,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_33",
+            "start_ms": 17.0259541015625
+          },
+          {
+            "category": "other",
+            "end_ms": 17.04041845703125,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 17.0341142578125
+          },
+          {
+            "category": "triton",
+            "end_ms": 17.0469140625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 17.04141015625
+          },
+          {
+            "category": "other",
+            "end_ms": 17.05417822265625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 17.04838623046875
+          },
+          {
+            "category": "triton",
+            "end_ms": 17.05936181640625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 17.055169921875
+          },
+          {
+            "category": "other",
+            "end_ms": 17.06697802734375,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 17.060673828125
+          },
+          {
+            "category": "other",
+            "end_ms": 17.103490234375,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 17.09341015625
+          },
+          {
+            "category": "other",
+            "end_ms": 17.11792138671875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 17.1080341796875
+          },
+          {
+            "category": "other",
+            "end_ms": 17.1297607421875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 17.12115380859375
+          },
+          {
+            "category": "other",
+            "end_ms": 17.14147412109375,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 17.1337939453125
+          },
+          {
+            "category": "other",
+            "end_ms": 17.22528125,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native",
+            "start_ms": 17.22051318359375
+          },
+          {
+            "category": "other",
+            "end_ms": 17.2816650390625,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 17.26912109375
+          },
+          {
+            "category": "other",
+            "end_ms": 31.57130029296875,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 17.3316171875
+          },
+          {
+            "category": "triton",
+            "end_ms": 31.5907880859375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_34",
+            "start_ms": 31.57376416015625
+          },
+          {
+            "category": "other",
+            "end_ms": 31.601412109375,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 31.59222802734375
+          },
+          {
+            "category": "triton",
+            "end_ms": 31.6081962890625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 31.60272314453125
+          },
+          {
+            "category": "other",
+            "end_ms": 31.6152998046875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 31.60960302734375
+          },
+          {
+            "category": "triton",
+            "end_ms": 31.620740234375,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 31.616580078125
+          },
+          {
+            "category": "other",
+            "end_ms": 31.62880322265625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 31.62205224609375
+          },
+          {
+            "category": "triton",
+            "end_ms": 31.6335078125,
+            "family": "triton",
+            "label": "triton_poi_fused_tanh_view_32",
+            "start_ms": 31.6297958984375
+          },
+          {
+            "category": "other",
+            "end_ms": 31.65430810546875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortHistogramKernel<cub::CUB_2008",
+            "start_ms": 31.65139599609375
+          },
+          {
+            "category": "other",
+            "end_ms": 31.6700830078125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 31.66022802734375
+          },
+          {
+            "category": "other",
+            "end_ms": 31.68448291015625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 31.6747548828125
+          },
+          {
+            "category": "other",
+            "end_ms": 31.69731494140625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 31.68861181640625
+          },
+          {
+            "category": "other",
+            "end_ms": 31.7087080078125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 31.700962890625
+          },
+          {
+            "category": "other",
+            "end_ms": 31.8086748046875,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native",
+            "start_ms": 31.80393896484375
+          },
+          {
+            "category": "other",
+            "end_ms": 31.877283203125,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 31.86384326171875
+          },
+          {
+            "category": "other",
+            "end_ms": 43.5914990234375,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 31.93705908203125
+          },
+          {
+            "category": "triton",
+            "end_ms": 43.61069921875,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_34",
+            "start_ms": 43.5938671875
+          },
+          {
+            "category": "other",
+            "end_ms": 43.62103515625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 43.612203125
+          },
+          {
+            "category": "triton",
+            "end_ms": 43.6275947265625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 43.62202587890625
+          },
+          {
+            "category": "other",
+            "end_ms": 43.634123046875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 43.62868310546875
+          },
+          {
+            "category": "triton",
+            "end_ms": 43.63952978515625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 43.63540283203125
+          },
+          {
+            "category": "other",
+            "end_ms": 43.64714599609375,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 43.64052197265625
+          },
+          {
+            "category": "triton",
+            "end_ms": 43.65226611328125,
+            "family": "triton",
+            "label": "triton_poi_fused_tanh_view_32",
+            "start_ms": 43.64842626953125
+          },
+          {
+            "category": "other",
+            "end_ms": 43.68893798828125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 43.67876220703125
+          },
+          {
+            "category": "other",
+            "end_ms": 43.70234619140625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 43.6924580078125
+          },
+          {
+            "category": "other",
+            "end_ms": 43.71517822265625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 43.70641015625
+          },
+          {
+            "category": "other",
+            "end_ms": 43.72609033203125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 43.71841015625
+          },
+          {
+            "category": "other",
+            "end_ms": 43.8212255859375,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native",
+            "start_ms": 43.81636181640625
+          },
+          {
+            "category": "other",
+            "end_ms": 43.88746630859375,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 43.8746982421875
+          },
+          {
+            "category": "other",
+            "end_ms": 58.02929296875,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 43.94877783203125
+          },
+          {
+            "category": "triton",
+            "end_ms": 58.049708984375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_34",
+            "start_ms": 58.03214111328125
+          },
+          {
+            "category": "other",
+            "end_ms": 58.05998095703125,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 58.0509248046875
+          },
+          {
+            "category": "triton",
+            "end_ms": 58.0668291015625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 58.06129296875
+          },
+          {
+            "category": "other",
+            "end_ms": 58.07377294921875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 58.0681728515625
+          },
+          {
+            "category": "triton",
+            "end_ms": 58.07921337890625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 58.0749892578125
+          },
+          {
+            "category": "other",
+            "end_ms": 58.08692529296875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 58.080205078125
+          },
+          {
+            "category": "other",
+            "end_ms": 58.1072451171875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortHistogramKernel<cub::CUB_2008",
+            "start_ms": 58.1043330078125
+          },
+          {
+            "category": "other",
+            "end_ms": 58.12305322265625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 58.1131650390625
+          },
+          {
+            "category": "other",
+            "end_ms": 58.136205078125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 58.12666796875
+          },
+          {
+            "category": "other",
+            "end_ms": 58.14900439453125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 58.1403642578125
+          },
+          {
+            "category": "other",
+            "end_ms": 58.15985302734375,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 58.1521728515625
+          },
+          {
+            "category": "other",
+            "end_ms": 58.2476923828125,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native",
+            "start_ms": 58.2431162109375
+          },
+          {
+            "category": "other",
+            "end_ms": 58.3027001953125,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 58.2901240234375
+          },
+          {
+            "category": "other",
+            "end_ms": 69.64462939453125,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 58.3502841796875
+          },
+          {
+            "category": "triton",
+            "end_ms": 69.6637333984375,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_34",
+            "start_ms": 69.6471572265625
+          },
+          {
+            "category": "other",
+            "end_ms": 69.6741650390625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 69.665044921875
+          },
+          {
+            "category": "triton",
+            "end_ms": 69.68069287109375,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 69.67518896484376
+          },
+          {
+            "category": "other",
+            "end_ms": 69.68718896484376,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 69.681716796875
+          },
+          {
+            "category": "triton",
+            "end_ms": 69.69262890625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 69.68843701171875
+          },
+          {
+            "category": "other",
+            "end_ms": 69.7005009765625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 69.69368505859374
+          },
+          {
+            "category": "gemm",
+            "end_ms": 69.74997265625,
+            "family": "gemm",
+            "label": "void cutlass::Kernel2<cutlass_75_tensorop_bf16_s1688gemm_bf16_64x64_tn_align1>(cutlass_75_tensorop_bf16_s1688gemm_bf16_6",
+            "start_ms": 69.702548828125
+          },
+          {
+            "category": "gemm",
+            "end_ms": 69.79874072265625,
+            "family": "gemm",
+            "label": "void cutlass::Kernel2<cutlass_75_tensorop_bf16_s1688gemm_bf16_64x64_tn_align1>(cutlass_75_tensorop_bf16_s1688gemm_bf16_6",
+            "start_ms": 69.751380859375
+          },
+          {
+            "category": "other",
+            "end_ms": 69.83659716796875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 69.8031572265625
+          },
+          {
+            "category": "other",
+            "end_ms": 69.8729169921875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 69.8410439453125
+          },
+          {
+            "category": "other",
+            "end_ms": 69.9101640625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 69.877908203125
+          },
+          {
+            "category": "other",
+            "end_ms": 69.948595703125,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 69.91419580078124
+          },
+          {
+            "category": "other",
+            "end_ms": 69.9867080078125,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 69.95339599609375
+          },
+          {
+            "category": "other",
+            "end_ms": 70.02558837890625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 69.99134814453124
+          },
+          {
+            "category": "other",
+            "end_ms": 70.0621640625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 70.0300361328125
+          },
+          {
+            "category": "other",
+            "end_ms": 70.0974599609375,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 70.06619580078124
+          },
+          {
+            "category": "other",
+            "end_ms": 70.13480419921875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 70.12488427734375
+          },
+          {
+            "category": "other",
+            "end_ms": 70.14933203125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 70.13960400390626
+          },
+          {
+            "category": "other",
+            "end_ms": 70.16098046875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 70.1525322265625
+          },
+          {
+            "category": "other",
+            "end_ms": 70.17221240234375,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 70.16446826171875
+          },
+          {
+            "category": "other",
+            "end_ms": 70.2826748046875,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native",
+            "start_ms": 70.27393994140625
+          },
+          {
+            "category": "other",
+            "end_ms": 70.35765087890626,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 70.3335869140625
+          },
+          {
+            "category": "other",
+            "end_ms": 83.03810498046874,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 70.409619140625
+          },
+          {
+            "category": "triton",
+            "end_ms": 83.08037744140626,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_35",
+            "start_ms": 83.04076123046875
+          },
+          {
+            "category": "other",
+            "end_ms": 83.0987451171875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 83.08184912109375
+          },
+          {
+            "category": "triton",
+            "end_ms": 83.1053369140625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 83.09989697265625
+          },
+          {
+            "category": "other",
+            "end_ms": 83.11221728515625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 83.1066171875
+          },
+          {
+            "category": "triton",
+            "end_ms": 83.117369140625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 83.11317724609376
+          },
+          {
+            "category": "other",
+            "end_ms": 83.1248251953125,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 83.11839306640626
+          },
+          {
+            "category": "triton",
+            "end_ms": 83.129880859375,
+            "family": "triton",
+            "label": "triton_poi_fused_tanh_view_32",
+            "start_ms": 83.1261689453125
+          },
+          {
+            "category": "other",
+            "end_ms": 83.16760888671875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 83.134873046875
+          },
+          {
+            "category": "other",
+            "end_ms": 83.20511279296875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 83.17244091796876
+          },
+          {
+            "category": "other",
+            "end_ms": 83.226201171875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortHistogramKernel<cub::CUB_2008",
+            "start_ms": 83.2232890625
+          },
+          {
+            "category": "other",
+            "end_ms": 83.2425849609375,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 83.23279296875
+          },
+          {
+            "category": "other",
+            "end_ms": 83.25647265625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 83.246712890625
+          },
+          {
+            "category": "other",
+            "end_ms": 83.26904931640625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 83.26060107421876
+          },
+          {
+            "category": "other",
+            "end_ms": 83.28034521484375,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 83.2726650390625
+          },
+          {
+            "category": "other",
+            "end_ms": 83.36943310546874,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native",
+            "start_ms": 83.36072900390624
+          },
+          {
+            "category": "other",
+            "end_ms": 83.43356103515625,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 83.40943212890625
+          },
+          {
+            "category": "other",
+            "end_ms": 96.23993408203125,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 83.47247216796875
+          },
+          {
+            "category": "triton",
+            "end_ms": 96.282078125,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_35",
+            "start_ms": 96.2426220703125
+          },
+          {
+            "category": "other",
+            "end_ms": 96.2994541015625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 96.2836142578125
+          },
+          {
+            "category": "triton",
+            "end_ms": 96.30594970703125,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 96.3003818359375
+          },
+          {
+            "category": "other",
+            "end_ms": 96.31302197265624,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 96.3072939453125
+          },
+          {
+            "category": "triton",
+            "end_ms": 96.31858984375,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 96.314333984375
+          },
+          {
+            "category": "other",
+            "end_ms": 96.32751806640626,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 96.32073388671876
+          },
+          {
+            "category": "other",
+            "end_ms": 96.37724609375,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x288_64x4_2x1_v_bz_coopA_bias_NNT",
+            "start_ms": 96.33193408203125
+          },
+          {
+            "category": "triton",
+            "end_ms": 96.4572138671875,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_36",
+            "start_ms": 96.37865380859375
+          },
+          {
+            "category": "other",
+            "end_ms": 96.5302060546875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 96.4626220703125
+          },
+          {
+            "category": "triton",
+            "end_ms": 96.56668505859375,
+            "family": "triton",
+            "label": "triton_poi_fused_cat_view_37",
+            "start_ms": 96.5324130859375
+          },
+          {
+            "category": "other",
+            "end_ms": 96.5871650390625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortHistogramKernel<cub::CUB_2008",
+            "start_ms": 96.5842529296875
+          },
+          {
+            "category": "other",
+            "end_ms": 96.60348486328125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 96.59372509765625
+          },
+          {
+            "category": "other",
+            "end_ms": 96.61702099609376,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 96.607548828125
+          },
+          {
+            "category": "other",
+            "end_ms": 96.629884765625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 96.62169287109376
+          },
+          {
+            "category": "other",
+            "end_ms": 96.64079736328125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 96.6331171875
+          },
+          {
+            "category": "other",
+            "end_ms": 96.74626904296875,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native",
+            "start_ms": 96.73010888671875
+          },
+          {
+            "category": "other",
+            "end_ms": 96.82918115234375,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 96.78214111328126
+          },
+          {
+            "category": "other",
+            "end_ms": 122.6093203125,
+            "family": "other",
+            "label": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+            "start_ms": 96.8464931640625
+          },
+          {
+            "category": "triton",
+            "end_ms": 122.68852001953125,
+            "family": "triton",
+            "label": "triton_poi_fused__to_copy_view_38",
+            "start_ms": 122.61210400390625
+          },
+          {
+            "category": "other",
+            "end_ms": 122.72666357421875,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 122.6897998046875
+          },
+          {
+            "category": "triton",
+            "end_ms": 122.73373486328126,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_30",
+            "start_ms": 122.72823095703124
+          },
+          {
+            "category": "other",
+            "end_ms": 122.7402314453125,
+            "family": "other",
+            "label": "nvjet_sm90_tst_16x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 122.73476025390624
+          },
+          {
+            "category": "triton",
+            "end_ms": 122.7453837890625,
+            "family": "triton",
+            "label": "triton_poi_fused_gelu_view_31",
+            "start_ms": 122.74119091796875
+          },
+          {
+            "category": "other",
+            "end_ms": 122.7530947265625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_32x384_64x4_1x2_h_bz_bias_TNN",
+            "start_ms": 122.74643994140625
+          },
+          {
+            "category": "triton",
+            "end_ms": 122.75789501953125,
+            "family": "triton",
+            "label": "triton_poi_fused_tanh_view_32",
+            "start_ms": 122.75405517578125
+          },
+          {
+            "category": "other",
+            "end_ms": 122.7944072265625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 122.76282421875
+          },
+          {
+            "category": "other",
+            "end_ms": 122.8320712890625,
+            "family": "other",
+            "label": "nvjet_sm90_tst_128x256_64x4_1x2_h_bz_coopA_bias_TNN",
+            "start_ms": 122.79901513671875
+          },
+          {
+            "category": "other",
+            "end_ms": 122.86883935546875,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 122.85901513671875
+          },
+          {
+            "category": "other",
+            "end_ms": 122.88163916015625,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 122.8720390625
+          },
+          {
+            "category": "other",
+            "end_ms": 122.893958984375,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 122.88576708984375
+          },
+          {
+            "category": "other",
+            "end_ms": 122.90538330078125,
+            "family": "other",
+            "label": "void cub::CUB_200802_SM_520_600_610_700_750_800_860_890_900_1000_1200_1210::DeviceRadixSortOnesweepKernel<cub::CUB_20080",
+            "start_ms": 122.89763916015625
+          },
+          {
+            "category": "other",
+            "end_ms": 123.00586279296876,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native",
+            "start_ms": 122.98947900390625
+          },
+          {
+            "category": "other",
+            "end_ms": 123.08407080078125,
+            "family": "other",
+            "label": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::nati",
+            "start_ms": 123.0372548828125
+          }
+        ],
+        "step_id": "train_step#3 forward"
+      }
+    ],
+    "title": "Forward-pass dominant kernels"
+  },
+  "pipeline": {
+    "duration_ms": 855.6634189453125,
+    "lanes": [
+      {
+        "name": "CPU",
+        "spans": [
+          {
+            "category": "forward",
+            "end_ms": 732.0748359375,
+            "label": "forward",
+            "start_ms": 597.298173828125
+          },
+          {
+            "category": "forward",
+            "end_ms": 796.0370078125,
+            "label": "loss",
+            "start_ms": 732.088255859375
+          },
+          {
+            "category": "backward",
+            "end_ms": 854.4002709960937,
+            "label": "backward",
+            "start_ms": 796.18130078125
+          },
+          {
+            "category": "optimizer",
+            "end_ms": 855.6577197265625,
+            "label": "optimizer",
+            "start_ms": 854.4263486328125
+          },
+          {
+            "category": "data",
+            "end_ms": 597.2374599609375,
+            "label": "dataload",
+            "start_ms": 0.0
+          }
+        ]
+      },
+      {
+        "name": "GPU",
+        "spans": [
+          {
+            "annotation": "Measured first-kernel gap; attribution is limited without CUDA synchronization events.",
+            "category": "bubble",
+            "end_ms": 563.9233989257813,
+            "label": "GPU idle before first kernel",
+            "start_ms": 0.0
+          },
+          {
+            "category": "forward",
+            "end_ms": 855.5480327148438,
+            "label": "observed kernel envelope",
+            "start_ms": 563.9233989257813
+          },
+          {
+            "category": "idle",
+            "end_ms": 855.6634189453125,
+            "label": "GPU idle after last kernel",
+            "start_ms": 855.5480327148438
+          }
+        ]
+      }
+    ],
+    "step_id": "train_step#3",
+    "summary": "Measured CPU ranges and GPU kernel envelope from the selected active step; CUDA synchronization events are absent.",
+    "title": "GeoTransolver volume: CPU/GPU pipeline"
+  },
+  "schema_version": "0.1"
+}

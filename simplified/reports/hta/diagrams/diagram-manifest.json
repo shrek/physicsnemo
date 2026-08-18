@@ -1,0 +1,9 @@
+{
+  "input": "/mymount/ramu-data/repos/physicsnemo/simplified/outputs/runs/analyze-geotransolver-volume-1/artifacts/phase1_20260818T190953Z_0defc40a/hta/diagram-data.json",
+  "outputs": {
+    "cpu_gpu_pipeline": "/mymount/ramu-data/repos/physicsnemo/simplified/outputs/runs/analyze-geotransolver-volume-1/artifacts/phase1_20260818T190953Z_0defc40a/hta/diagrams/cpu-gpu-pipeline.svg",
+    "forward_dominant_kernels": "/mymount/ramu-data/repos/physicsnemo/simplified/outputs/runs/analyze-geotransolver-volume-1/artifacts/phase1_20260818T190953Z_0defc40a/hta/diagrams/forward-dominant-kernels.svg",
+    "in_step_gpu_bubbles": "/mymount/ramu-data/repos/physicsnemo/simplified/outputs/runs/analyze-geotransolver-volume-1/artifacts/phase1_20260818T190953Z_0defc40a/hta/diagrams/in-step-gpu-bubbles.svg"
+  },
+  "schema_version": "0.1"
+}
