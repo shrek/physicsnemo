@@ -42,12 +42,11 @@ from simplified.types import (
 
 REQUIRED_RANGES = (
     "train_step",
-    "dataloader_wait",
-    "host_to_device",
+    "dataload",
     "forward",
     "loss",
     "backward",
-    "optimizer_step",
+    "optimizer",
 )
 
 
@@ -118,7 +117,6 @@ class ProgressVerdict(BaseModel):
     """Generic semantic decision made at an adaptive CodeAct boundary."""
 
     decision: Literal["extend", "finalize", "stop"]
-    checkpoint: str = ""
     reason: str = ""
 
 
@@ -481,65 +479,25 @@ class InstrumentationProposer(SourceAgent):
         required_ranges: tuple[str, ...],
         previous: Critique | None,
     ) -> InstrumentationPlan:
-        """Inspect the training loop and return a valid, minimal instrumentation patch.
+        """Return the smallest applicable opt-in instrumentation diff.
 
-        For this GeoTransolver task, begin finalizing by turn 18. You may use the
-        existing 50-turn CodeAct budget only while each additional turn makes material
-        progress toward a complete, applicable unified diff; otherwise return the best
-        complete InstrumentationPlan immediately. Finish repository discovery by turn
-        12 and reserve turns 13 through 18 for composing and checking the unified diff.
-        Do not execute, apply, or validate the patch
-        yourself and do not invoke subprocess or shell commands; a separate critic
-        applies the patch, performs static checks, and runs a bounded profile validation
-        in a disposable Git worktree. Any failure is returned as feedback for your next
-        proposal, so resolve exact runtime API errors rather than merely compiling.
+        Resolve previous critic feedback. Inspect the requested entry point and
+        reuse its existing profiler and result-output path; do not create a
+        competing profiler or output protocol. Keep normal execution and
+        training semantics unchanged when profiling is disabled.
 
-        Resolve all previous critic feedback. Inspect existing profiler support first
-        and integrate with it instead of creating a competing profiler. The patch must
-        be a syntactically valid unified Git diff against repository HEAD with accurate
-        hunk counts and context; it must apply using git apply.
+        The patch must be a valid unified Git diff that applies to the supplied
+        repository. Its declared ranges must exactly match the named ranges it
+        emits around real work. Cover {required_ranges} where those phases run;
+        never add empty or misleading ranges. Keep data loading separate from
+        device transfer and train-step computation, and keep the capture
+        bounded by the repository's existing profiling controls.
 
-        For the GeoTransolver volume recipe, before inspecting implementation details,
-        use read_file to read these repository-local instructions:
-        - skills/physicsnemo-training-performance-tuner/SKILL.md
-        - skills/physicsnemo-training-performance-tuner/references/geotransolver-volume.md
-        - skills/physicsnemo-training-performance-tuner/references/phase1-protocol.md
-        Then inspect only these implementation files: the recipe's src/train.py,
-        src/v0_results.py, conf/train.yaml, conf/model/geotransolver_volume.yaml,
-        datasets/drivaer_ml_volume.yaml, and the PhysicsNeMo profiler interface and
-        torch wrapper. Do not call list_files after reading the three guidance files.
-        Apply the guidance as an instrumentation contract: retain the representative compiled
-        workload, capture a bounded post-warmup window, and separate dataloader,
-        geometry/feature construction, forward, loss, backward, and optimizer work
-        when those phases exist. Do not copy historical findings or make an
-        optimization recommendation before trace evidence exists.
-
-        This recipe already has an opt-in +v0_result=true bridge that emits the final
-        TraceResult after profiler finalization. Preserve that bridge and do not add a
-        second stdout-result mechanism. Ensure its trace contains the required range
-        names rather than merely returning declared names.
-
-        Preserve numerics, sample order, optimizer behavior, and normal execution when
-        profiling is disabled. Instrumentation must be opt-in. Emit every required
-        range name, including one outer train_step range and a dataloader_wait range
-        that isolates iterator advancement. Place profiler.step() exactly once per
-        logical training step. Also instrument feature construction, distributed
-        synchronization, validation, or checkpoint work when those phases actually
-        exist; do not add misleading empty ranges.
-
-        Capture a bounded Kineto trace after model/compiler, dataloader, and allocator
-        warmup, with five steady-state active iterations by default. Use unique trace
-        names per rank for distributed runs. Keep stack and shape collection disabled
-        in the primary capture unless the existing profiler requires them.
-
-        After profiler finalization, the final non-empty stdout line must be a JSON
-        object accepted as TraceResult with completed=true, the actual trace path
-        inside the working tree, the emitted range names, and a non-empty factual
-        summary. Print nothing after that JSON object. Do not import the simplified
-        package from the training repository merely to construct this JSON.
-
-        Make no optimization or unrelated source change and never claim profiled wall
-        time is baseline performance.
+        Do not apply or run the patch yourself. Return the best complete diff
+        promptly; the critic performs static and runtime validation.
+        Examples under `simplified/examples/instrumentation/` illustrate
+        instrumentation patterns. They need not match the requested model or
+        recipe and never replace inspection of the supplied source.
         """
         ...
 

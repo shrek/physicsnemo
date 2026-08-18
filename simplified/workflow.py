@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -112,6 +113,56 @@ class RunContext:
         self.path("run.json").write_text(json.dumps(payload, indent=2) + "\n")
 
 
+class WorkflowCheckpointStore:
+    """Durable, input-bound results for restartable composite workflows."""
+
+    def __init__(self, run: RunContext, workflow: str, inputs: BaseModel, *, resume: bool):
+        self.directory = run.path(Path("checkpoints") / workflow)
+        self.directory.mkdir(parents=True, exist_ok=True)
+        self.resume = resume
+        self.workflow = workflow
+        self.input_digest = hashlib.sha256(inputs.model_dump_json().encode()).hexdigest()
+        self.manifest = self.directory / "manifest.json"
+        if self.manifest.exists():
+            saved = json.loads(self.manifest.read_text())
+            if saved.get("input_digest") != self.input_digest:
+                raise WorkflowError(
+                    f"run ID already contains checkpoints for different {workflow} inputs; "
+                    "choose a new --run-id"
+                )
+        self._write_manifest()
+
+    def _write_manifest(self) -> None:
+        completed = sorted(path.stem for path in self.directory.glob("*.json") if path != self.manifest)
+        self._atomic_write(
+            self.manifest,
+            json.dumps({"version": 1, "workflow": self.workflow, "input_digest": self.input_digest, "completed_steps": completed}, indent=2) + "\n",
+        )
+
+    @staticmethod
+    def _atomic_write(path: Path, content: str) -> None:
+        temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+        try:
+            temporary.write_text(content)
+            os.replace(temporary, path)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+
+    def load(self, step: str, model: type[BaseModel]) -> BaseModel | None:
+        if not self.resume:
+            return None
+        path = self.directory / f"{step}.json"
+        if not path.is_file():
+            return None
+        try:
+            return model.model_validate_json(path.read_text())
+        except (OSError, ValueError) as error:
+            raise WorkflowError(f"invalid checkpoint {path}: {error}") from error
+
+    def save(self, step: str, value: BaseModel) -> None:
+        self._atomic_write(self.directory / f"{step}.json", value.model_dump_json(indent=2) + "\n")
+        self._write_manifest()
 class WorkflowError(RuntimeError):
     """Raised when a user contract or deterministic verifier fails."""
 
@@ -175,26 +226,36 @@ class InstrumentationWorkflow(Agent):
     async def run(
         self,
         request: TrainingRequest,
+        plan: InstrumentationPlan | None = None,
+        on_plan_accepted: Callable[[InstrumentationPlan], None] | None = None,
     ) -> tuple[InstrumentationPlan, TraceResult]:
         feedback = None
-        for _ in range(self.max_attempts):
-            plan = await self.agents.instrumentation.propose(
-                request.spec, REQUIRED_RANGES, feedback
-            )
-            feedback = self.validate_patch_scope(
-                plan.patch, request.allowed_change_paths
-            )
-            if feedback.accepted:
-                feedback = self.agents.instrumentation_critic.review(
-                    request.spec, plan, REQUIRED_RANGES
+        if plan is None:
+            for _ in range(self.max_attempts):
+                candidate = await self.agents.instrumentation.propose(
+                    request.spec, REQUIRED_RANGES, feedback
                 )
-            if not feedback.accepted:
-                continue
+                feedback = self.validate_patch_scope(
+                    candidate.patch, request.allowed_change_paths
+                )
+                if feedback.accepted:
+                    feedback = self.agents.instrumentation_critic.review(
+                        request.spec, candidate, REQUIRED_RANGES
+                    )
+                if feedback.accepted:
+                    plan = candidate
+                    if on_plan_accepted:
+                        on_plan_accepted(plan)
+                    break
+            if plan is None:
+                self.failed("instrumentation", feedback)
+
+        for _ in range(self.max_attempts):
             trace = self.agents.runner.profile(request.spec, plan)
             feedback = self.agents.trace_critic.review(trace, REQUIRED_RANGES)
             if feedback.accepted:
                 return plan, trace
-        self.failed("instrumentation", feedback)
+        self.failed("trace", feedback)
         raise AssertionError("unreachable")
 
     def validate_patch_scope(
@@ -316,20 +377,62 @@ class PerformanceAnalysisWorkflow(Agent):
 
     agents: Annotated[Agents, hidden]
 
-    def __init__(self, agents: Agents, *, llm: UnifiedLLM, max_attempts: int):
+    def __init__(
+        self,
+        agents: Agents,
+        *,
+        llm: UnifiedLLM,
+        max_attempts: int,
+        checkpoints: WorkflowCheckpointStore | None = None,
+    ):
         super().__init__(llm=llm)
         self.agents = agents
         self.max_attempts = max_attempts
+        self.checkpoints = checkpoints
 
     async def run(self, request: TrainingRequest) -> PerformanceAnalysis:
-        spec = RequestValidationWorkflow(self.agents, llm=self._llm).run(request)
-        baseline = await self.agents.runner.benchmark(spec)
-        plan, trace = await InstrumentationWorkflow(
-            self.agents, llm=self._llm, max_attempts=self.max_attempts
-        ).run(request)
-        performance_report = PerformanceReportWorkflow(
-            self.agents, llm=self._llm
-        ).run(spec, baseline, plan, trace)
+        spec = self.checkpoints.load("validate-request", TrainingSpec) if self.checkpoints else None
+        if spec is None:
+            spec = RequestValidationWorkflow(self.agents, llm=self._llm).run(request)
+            if self.checkpoints:
+                self.checkpoints.save("validate-request", spec)
+
+        baseline = self.checkpoints.load("benchmark", BenchmarkResult) if self.checkpoints else None
+        if baseline is None:
+            baseline = await self.agents.runner.benchmark(spec)
+            if self.checkpoints:
+                self.checkpoints.save("benchmark", baseline)
+
+        plan = self.checkpoints.load("instrumentation", InstrumentationPlan) if self.checkpoints else None
+        trace = self.checkpoints.load("profile", TraceResult) if self.checkpoints else None
+        if plan is None or trace is None:
+            plan, trace = await InstrumentationWorkflow(
+                self.agents, llm=self._llm, max_attempts=self.max_attempts
+            ).run(
+                request,
+                plan=plan,
+                on_plan_accepted=(
+                    lambda accepted: self.checkpoints.save("instrumentation", accepted)
+                    if self.checkpoints
+                    else None
+                ),
+            )
+            if self.checkpoints:
+                self.checkpoints.save("instrumentation", plan)
+                self.checkpoints.save("profile", trace)
+
+        performance_report = (
+            self.checkpoints.load("create-performance-report", PerformanceReport)
+            if self.checkpoints
+            else None
+        )
+        if performance_report is None:
+            performance_report = PerformanceReportWorkflow(
+                self.agents, llm=self._llm
+            ).run(spec, baseline, plan, trace)
+            if self.checkpoints:
+                self.checkpoints.save("create-performance-report", performance_report)
+
         return PerformanceAnalysis(
             request=request,
             baseline=baseline,
@@ -344,20 +447,43 @@ class PerformanceOptimizationWorkflow(Agent):
 
     agents: Annotated[Agents, hidden]
 
-    def __init__(self, agents: Agents, *, llm: UnifiedLLM, max_attempts: int):
+    def __init__(
+        self,
+        agents: Agents,
+        *,
+        llm: UnifiedLLM,
+        max_attempts: int,
+        checkpoints: WorkflowCheckpointStore | None = None,
+    ):
         super().__init__(llm=llm)
         self.agents = agents
         self.max_attempts = max_attempts
+        self.checkpoints = checkpoints
 
     async def run(self, analysis: PerformanceAnalysis) -> OptimizationResult:
         if not analysis.performance_report.completed:
             raise WorkflowError("performance analysis report is incomplete")
-        hotspot, route = await HotspotWorkflow(self.agents, llm=self._llm).run(
-            analysis.trace
-        )
-        proposal, candidate = await CandidateWorkflow(
-            self.agents, llm=self._llm, max_attempts=self.max_attempts
-        ).run(analysis.request, analysis.baseline, hotspot, route)
+
+        hotspot = self.checkpoints.load("analyze-hotspots", Hotspot) if self.checkpoints else None
+        route = self.checkpoints.load("route-hotspot", Route) if self.checkpoints else None
+        if hotspot is None or route is None:
+            hotspot, route = await HotspotWorkflow(self.agents, llm=self._llm).run(
+                analysis.trace
+            )
+            if self.checkpoints:
+                self.checkpoints.save("analyze-hotspots", hotspot)
+                self.checkpoints.save("route-hotspot", route)
+
+        proposal = self.checkpoints.load("propose-change", ChangeProposal) if self.checkpoints else None
+        candidate = self.checkpoints.load("benchmark-candidate", CandidateResult) if self.checkpoints else None
+        if proposal is None or candidate is None:
+            proposal, candidate = await CandidateWorkflow(
+                self.agents, llm=self._llm, max_attempts=self.max_attempts
+            ).run(analysis.request, analysis.baseline, hotspot, route)
+            if self.checkpoints:
+                self.checkpoints.save("propose-change", proposal)
+                self.checkpoints.save("benchmark-candidate", candidate)
+
         if candidate.benchmark is None:
             raise WorkflowError("accepted candidate has no benchmark")
         result = self.agents.report.build(
@@ -463,6 +589,8 @@ class WorkflowSteps(Agent):
         environment: TrainingEnvironment,
         llm: UnifiedLLM,
         max_attempts: int = 3,
+        run_context: RunContext | None = None,
+        resume: bool = True,
     ):
         super().__init__(llm=llm)
         if max_attempts < 1:
@@ -470,10 +598,30 @@ class WorkflowSteps(Agent):
         self.source = source
         self.environment = environment
         self.max_attempts = max_attempts
+        self.run_context = run_context
+        self.resume = resume
 
     @property
     def agents(self) -> Agents:
         return create_agents(self._llm, self.source, self.environment)
+
+    def _analysis_checkpoints(
+        self, request: TrainingRequest
+    ) -> WorkflowCheckpointStore | None:
+        if self.run_context is None:
+            return None
+        return WorkflowCheckpointStore(
+            self.run_context, "performance-analysis", request, resume=self.resume
+        )
+
+    def _optimization_checkpoints(
+        self, analysis: PerformanceAnalysis
+    ) -> WorkflowCheckpointStore | None:
+        if self.run_context is None:
+            return None
+        return WorkflowCheckpointStore(
+            self.run_context, "performance-optimization", analysis, resume=self.resume
+        )
 
     async def hello(self, name: str) -> HelloResponse:
         """Generate a greeting from the configured LLM."""
@@ -481,16 +629,18 @@ class WorkflowSteps(Agent):
 
     async def run_all(self, request: TrainingRequest) -> OptimizationResult:
         """Execute the complete optimization pipeline."""
-        return await TrainingOptimizer(
-            self.agents, llm=self._llm, max_attempts=self.max_attempts
-        ).run(request)
+        analysis = await self.analyze_performance(request)
+        return await self.optimize_performance(analysis)
 
     async def analyze_performance(
         self, request: TrainingRequest
     ) -> PerformanceAnalysis:
         """Build validated performance evidence through the report boundary."""
         return await PerformanceAnalysisWorkflow(
-            self.agents, llm=self._llm, max_attempts=self.max_attempts
+            self.agents,
+            llm=self._llm,
+            max_attempts=self.max_attempts,
+            checkpoints=self._analysis_checkpoints(request),
         ).run(request)
 
     async def optimize_performance(
@@ -498,7 +648,10 @@ class WorkflowSteps(Agent):
     ) -> OptimizationResult:
         """Evaluate one optimization from a completed performance analysis."""
         return await PerformanceOptimizationWorkflow(
-            self.agents, llm=self._llm, max_attempts=self.max_attempts
+            self.agents,
+            llm=self._llm,
+            max_attempts=self.max_attempts,
+            checkpoints=self._optimization_checkpoints(analysis),
         ).run(analysis)
 
     def validate_request(self, request: TrainingRequest) -> TrainingSpec:
@@ -739,6 +892,13 @@ def parser() -> argparse.ArgumentParser:
         help="caller-selected run ID; a step-prefixed ID is generated by default",
     )
     argument_parser.add_argument(
+        "--no-resume",
+        dest="resume",
+        action="store_false",
+        default=True,
+        help="ignore successful checkpoints and execute the workflow again",
+    )
+    argument_parser.add_argument(
         "--output-root",
         default="outputs/runs",
         help="parent directory for per-run outputs (default: outputs/runs)",
@@ -797,7 +957,14 @@ async def execute(args: argparse.Namespace, run: RunContext) -> BaseModel:
         if args.step in LLM_STEPS
         else FakeLLMClient()
     )
-    steps = WorkflowSteps(source, environment, llm, args.max_attempts)
+    steps = WorkflowSteps(
+        source,
+        environment,
+        llm,
+        args.max_attempts,
+        run_context=run,
+        resume=args.resume,
+    )
     try:
         handlers: dict[str, Callable[[], Awaitable[BaseModel] | BaseModel]] = {
             "hello": lambda: steps.hello(args.name),
