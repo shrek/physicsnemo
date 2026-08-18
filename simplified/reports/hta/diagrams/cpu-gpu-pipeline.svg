@@ -4,43 +4,43 @@ text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:25px;font-weight
 </style>
 <rect width="100%" height="100%" fill="#f8fafc"/>
 <text x="28" y="38" class="title">GeoTransolver volume: CPU/GPU pipeline</text>
-<text x="28" y="65" class="subtitle">Step train_step#3 · 855.7 ms · grey/red regions identify GPU idle bubbles</text>
+<text x="28" y="65" class="subtitle">Step train_step#3 · 867.9 ms · grey/red regions identify GPU idle bubbles</text>
 <line x1="180.0" y1="85" x2="180.0" y2="325" class="grid"/>
 <text x="180.0" y="347" text-anchor="middle" class="small">0.0</text>
 <line x1="388.0" y1="85" x2="388.0" y2="325" class="grid"/>
-<text x="388.0" y="347" text-anchor="middle" class="small">171.1</text>
+<text x="388.0" y="347" text-anchor="middle" class="small">173.6</text>
 <line x1="596.0" y1="85" x2="596.0" y2="325" class="grid"/>
-<text x="596.0" y="347" text-anchor="middle" class="small">342.3</text>
+<text x="596.0" y="347" text-anchor="middle" class="small">347.2</text>
 <line x1="804.0" y1="85" x2="804.0" y2="325" class="grid"/>
-<text x="804.0" y="347" text-anchor="middle" class="small">513.4</text>
+<text x="804.0" y="347" text-anchor="middle" class="small">520.7</text>
 <line x1="1012.0" y1="85" x2="1012.0" y2="325" class="grid"/>
-<text x="1012.0" y="347" text-anchor="middle" class="small">684.5</text>
+<text x="1012.0" y="347" text-anchor="middle" class="small">694.3</text>
 <line x1="1220.0" y1="85" x2="1220.0" y2="325" class="grid"/>
-<text x="1220.0" y="347" text-anchor="middle" class="small">855.7</text>
+<text x="1220.0" y="347" text-anchor="middle" class="small">867.9</text>
 <text x="162" y="136" text-anchor="end" class="lane">CPU</text>
 <rect x="180" y="105" width="1040" height="52" fill="#eef2f7" stroke="#8fa0b5"/>
-<rect x="906.0" y="105" width="163.8" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
-<text x="987.9" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">forward</text>
-<text x="987.9" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">134.8 ms</text>
-<rect x="1069.8" y="105" width="77.7" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
-<text x="1108.7" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">loss</text>
-<text x="1108.7" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">63.9 ms</text>
-<rect x="1147.7" y="105" width="70.8" height="52" fill="#af7aa1" fill-opacity="0.95" stroke="#ffffff"/>
-<text x="1183.1" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">backward</text>
-<text x="1183.1" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">58.2 ms</text>
-<rect x="1218.5" y="105" width="1.5" height="52" fill="#f28e2b" fill-opacity="0.95" stroke="#ffffff"/>
-<rect x="180.0" y="105" width="725.9" height="52" fill="#4e79a7" fill-opacity="0.95" stroke="#ffffff"/>
-<text x="543.0" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">dataload</text>
-<text x="543.0" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">597.2 ms</text>
+<rect x="910.3" y="105" width="162.7" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="991.6" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">forward</text>
+<text x="991.6" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">135.8 ms</text>
+<rect x="1073.0" y="105" width="75.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="1110.7" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">loss</text>
+<text x="1110.7" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">63.0 ms</text>
+<rect x="1148.7" y="105" width="69.9" height="52" fill="#af7aa1" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="1183.6" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">backward</text>
+<text x="1183.6" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">58.3 ms</text>
+<rect x="1218.6" y="105" width="1.5" height="52" fill="#f28e2b" fill-opacity="0.95" stroke="#ffffff"/>
+<rect x="180.0" y="105" width="730.2" height="52" fill="#4e79a7" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="545.1" y="128" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">dataload</text>
+<text x="545.1" y="145" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">609.4 ms</text>
 <text x="162" y="251" text-anchor="end" class="lane">GPU</text>
 <rect x="180" y="220" width="1040" height="52" fill="#eef2f7" stroke="#8fa0b5"/>
-<rect x="180.0" y="220" width="685.4" height="52" fill="#e15759" fill-opacity="0.75" stroke="#ffffff"/>
-<text x="522.7" y="243" text-anchor="middle" class="small" fill="#172033" style="fill:#172033">GPU idle before first kernel</text>
-<text x="522.7" y="260" text-anchor="middle" class="small" fill="#172033" style="fill:#172033">563.9 ms</text>
-<text x="522.7" y="295" text-anchor="middle" class="small">Measured first-kernel gap; attribution is limited without CUDA synchronization events.</text>
-<rect x="865.4" y="220" width="354.4" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
-<text x="1042.6" y="243" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">observed kernel envelope</text>
-<text x="1042.6" y="260" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">291.6 ms</text>
+<rect x="180.0" y="220" width="689.4" height="52" fill="#e15759" fill-opacity="0.75" stroke="#ffffff"/>
+<text x="524.7" y="243" text-anchor="middle" class="small" fill="#172033" style="fill:#172033">GPU idle before first kernel</text>
+<text x="524.7" y="260" text-anchor="middle" class="small" fill="#172033" style="fill:#172033">575.3 ms</text>
+<text x="524.7" y="295" text-anchor="middle" class="small">Measured first-kernel gap; attribution is limited without CUDA synchronization events.</text>
+<rect x="869.4" y="220" width="350.5" height="52" fill="#59a14f" fill-opacity="0.95" stroke="#ffffff"/>
+<text x="1044.7" y="243" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">observed kernel envelope</text>
+<text x="1044.7" y="260" text-anchor="middle" class="small" fill="#ffffff" style="fill:#ffffff">292.5 ms</text>
 <rect x="1219.9" y="220" width="1.5" height="52" fill="#d9d9d9" fill-opacity="0.75" stroke="#ffffff"/>
 <text x="180" y="366" class="subtitle">Measured CPU ranges and GPU kernel envelope from the selected active step; CUDA synchronization events are absent.</text>
 </svg>

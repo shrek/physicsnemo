@@ -1,9 +1,9 @@
 {
   "0": {
-    "launches": 198515,
-    "median_cpu_duration_us": 2.0,
+    "launches": 198514,
+    "median_cpu_duration_us": 1.0,
     "median_gpu_duration_us": 1.0,
     "median_launch_delay_us": 3.0,
-    "p95_launch_delay_us": 10383.199999999953
+    "p95_launch_delay_us": 10307.349999999977
   }
 }

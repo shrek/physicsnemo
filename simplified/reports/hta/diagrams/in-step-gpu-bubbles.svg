@@ -8,20 +8,20 @@ text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:25px;font-weight
 <line x1="180.0" y1="90" x2="180.0" y2="215" class="grid"/>
 <text x="180.0" y="237" text-anchor="middle" class="small">0.0</text>
 <line x1="388.0" y1="90" x2="388.0" y2="215" class="grid"/>
-<text x="388.0" y="237" text-anchor="middle" class="small">171.1</text>
+<text x="388.0" y="237" text-anchor="middle" class="small">173.6</text>
 <line x1="596.0" y1="90" x2="596.0" y2="215" class="grid"/>
-<text x="596.0" y="237" text-anchor="middle" class="small">342.3</text>
+<text x="596.0" y="237" text-anchor="middle" class="small">347.2</text>
 <line x1="804.0" y1="90" x2="804.0" y2="215" class="grid"/>
-<text x="804.0" y="237" text-anchor="middle" class="small">513.4</text>
+<text x="804.0" y="237" text-anchor="middle" class="small">520.7</text>
 <line x1="1012.0" y1="90" x2="1012.0" y2="215" class="grid"/>
-<text x="1012.0" y="237" text-anchor="middle" class="small">684.5</text>
+<text x="1012.0" y="237" text-anchor="middle" class="small">694.3</text>
 <line x1="1220.0" y1="90" x2="1220.0" y2="215" class="grid"/>
-<text x="1220.0" y="237" text-anchor="middle" class="small">855.7</text>
+<text x="1220.0" y="237" text-anchor="middle" class="small">867.9</text>
 <text x="162" y="145" text-anchor="end" class="lane">GPU</text>
 <rect x="180" y="112" width="1040" height="52" fill="#59a14f" fill-opacity="0.2" stroke="#8fa0b5"/>
-<rect x="180.0" y="112" width="685.4" height="52" fill="#e15759" stroke="#ffffff"/>
-<text x="522.7" y="185" text-anchor="middle" class="small">GPU idle before first kernel · 563.9 ms</text>
+<rect x="180.0" y="112" width="689.4" height="52" fill="#e15759" stroke="#ffffff"/>
+<text x="524.7" y="185" text-anchor="middle" class="small">GPU idle before first kernel · 575.3 ms</text>
 <rect x="1219.9" y="112" width="2.0" height="52" fill="#d9d9d9" stroke="#ffffff"/>
 <text x="1220.9" y="185" text-anchor="middle" class="small">GPU idle after last kernel · 0.1 ms</text>
-<text x="180" y="248" class="subtitle">Total classified idle: 564.0 ms (65.9% of step).</text>
+<text x="180" y="248" class="subtitle">Total classified idle: 575.4 ms (66.3% of step).</text>
 </svg>

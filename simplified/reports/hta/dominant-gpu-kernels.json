@@ -1,0 +1,110 @@
+[
+  {
+    "calls": 11,
+    "kernel": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+    "kernel_family": "other",
+    "mean_gpu_time_us": 10061.192,
+    "phase": "forward",
+    "selected_step_wall_time_pct": 12.752,
+    "total_gpu_time_us": 110673.109
+  },
+  {
+    "calls": 1,
+    "kernel": "radius_search_limited_select_batched_2985e173_cuda_kernel_forward",
+    "kernel_family": "other",
+    "mean_gpu_time_us": 26402.984,
+    "phase": "loss",
+    "selected_step_wall_time_pct": 3.042,
+    "total_gpu_time_us": 26402.984
+  },
+  {
+    "calls": 1,
+    "kernel": "_nearest_triangle_kernel",
+    "kernel_family": "other",
+    "mean_gpu_time_us": 10127.274,
+    "phase": "dataloader_wait",
+    "selected_step_wall_time_pct": 1.167,
+    "total_gpu_time_us": 10127.274
+  },
+  {
+    "calls": 9,
+    "kernel": "triton_poi_fused__softmax_backward_data__to_copy_add_div_expand_permute_squeeze_unsqueeze_view_26",
+    "kernel_family": "triton",
+    "mean_gpu_time_us": 825.296,
+    "phase": "backward",
+    "selected_step_wall_time_pct": 0.856,
+    "total_gpu_time_us": 7427.664
+  },
+  {
+    "calls": 9,
+    "kernel": "triton_red_fused__softmax_backward_data__to_copy_clamp_div_27",
+    "kernel_family": "triton",
+    "mean_gpu_time_us": 664.852,
+    "phase": "backward",
+    "selected_step_wall_time_pct": 0.689,
+    "total_gpu_time_us": 5983.667
+  },
+  {
+    "calls": 48,
+    "kernel": "nvjet_sm90_tst_112x128_64x7_2x1_v_bz_bias_TNN",
+    "kernel_family": "other",
+    "mean_gpu_time_us": 123.825,
+    "phase": "loss",
+    "selected_step_wall_time_pct": 0.685,
+    "total_gpu_time_us": 5943.601
+  },
+  {
+    "calls": 19,
+    "kernel": "triton_poi_fused__softmax__to_copy_add_clamp_div_ge_mul_neg_permute_scalar_tensor_sub_transpose_unsqueeze_view_where_45",
+    "kernel_family": "triton",
+    "mean_gpu_time_us": 293.525,
+    "phase": "loss",
+    "selected_step_wall_time_pct": 0.643,
+    "total_gpu_time_us": 5576.98
+  },
+  {
+    "calls": 18,
+    "kernel": "triton_per_fused__softmax__to_copy_amax_clamp_mul_sub_view_46",
+    "kernel_family": "triton",
+    "mean_gpu_time_us": 299.212,
+    "phase": "loss",
+    "selected_step_wall_time_pct": 0.621,
+    "total_gpu_time_us": 5385.814
+  },
+  {
+    "calls": 18,
+    "kernel": "triton_poi_fused__to_copy_add_div_permute_unsqueeze_48",
+    "kernel_family": "triton",
+    "mean_gpu_time_us": 286.186,
+    "phase": "loss",
+    "selected_step_wall_time_pct": 0.594,
+    "total_gpu_time_us": 5151.352
+  },
+  {
+    "calls": 18,
+    "kernel": "nvjet_sm90_tst_256x160_64x4_1x2_h_bz_coopA_NNT",
+    "kernel_family": "other",
+    "mean_gpu_time_us": 241.754,
+    "phase": "backward",
+    "selected_step_wall_time_pct": 0.501,
+    "total_gpu_time_us": 4351.572
+  },
+  {
+    "calls": 19,
+    "kernel": "nvjet_sm90_tst_128x256_64x4_2x1_v_bz_coopA_bias_TNN",
+    "kernel_family": "other",
+    "mean_gpu_time_us": 227.186,
+    "phase": "loss",
+    "selected_step_wall_time_pct": 0.497,
+    "total_gpu_time_us": 4316.536
+  },
+  {
+    "calls": 9,
+    "kernel": "triton_poi_fused__softmax__to_copy_clamp_mul_sub_view_25",
+    "kernel_family": "triton",
+    "mean_gpu_time_us": 411.953,
+    "phase": "backward",
+    "selected_step_wall_time_pct": 0.427,
+    "total_gpu_time_us": 3707.577
+  }
+]

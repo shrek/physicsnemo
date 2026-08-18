@@ -1,7 +1,7 @@
 # GeoTransolver volume training performance analysis
 
 _Phase 1: measurement, diagnosis, and routing only._  
-_Run: `phase1_20260818T190953Z` · HTA 0.5.0_
+_Run: `phase1_20260818T223226Z` · HTA 0.5.0_
 
 ## Executive summary
 
@@ -31,27 +31,27 @@ A bounded five-active-step profile now has `ProfilerStep` boundaries and HTA evi
 
 | Metric | Value | Unit |
 |---|---:|---|
-| Step time | 841.170 | ms |
+| Step time | 832.372 | ms |
 | Correctness value | 0.076905847 | `validation_loss` |
-| Selected trace step | 855.663 | ms |
+| Selected trace step | 867.890 | ms |
 
 ## Traces and whole-trace temporal breakdown
 
-Trace input: `/mymount/ramu-data/repos/physicsnemo/simplified/outputs/runs/analyze-geotransolver-volume-1/artifacts/trace-332ccd2b42ca.json`. The copied Kineto trace, HTA logs, tables, and graph archive are retained in this bundle.
+Trace input: `/mymount/ramu-data/repos/physicsnemo/simplified/outputs/runs/analyze-geotransolver-volume-2/artifacts/trace-38cb884af762.json`. The copied Kineto trace, HTA logs, tables, and graph archive are retained in this bundle.
 
 | rank | idle time (us) | compute time (us) | non-compute time (us) | kernel time (us) | idle % | compute % | non-compute % |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 21277800.0 | 5200643.0 | 129678.0 | 26608121.0 | 79.97 | 19.55 | 0.49 |
+| 0 | 22326687.0 | 5192986.0 | 128483.0 | 27648156.0 | 80.75 | 18.78 | 0.46 |
 
 ## Per-step phase decomposition
 
 | Phase | CPU wall time | GPU busy | Idle | Step share | Evidence |
 |---|---:|---:|---:|---:|---|
-| forward | 134.777 ms | — | — | 15.8% | `hta/diagram-data.json` |
-| loss | 63.949 ms | — | — | 7.5% | `hta/diagram-data.json` |
-| backward | 58.219 ms | — | — | 6.8% | `hta/diagram-data.json` |
-| optimizer | 1.231 ms | — | — | 0.1% | `hta/diagram-data.json` |
-| dataload | 597.237 ms | — | — | 69.8% | `hta/diagram-data.json` |
+| forward | 135.791 ms | — | — | 15.6% | `hta/diagram-data.json` |
+| loss | 62.968 ms | — | — | 7.3% | `hta/diagram-data.json` |
+| backward | 58.336 ms | — | — | 6.7% | `hta/diagram-data.json` |
+| optimizer | 1.170 ms | — | — | 0.1% | `hta/diagram-data.json` |
+| dataload | 609.370 ms | — | — | 70.2% | `hta/diagram-data.json` |
 
 ## Critical path
 
@@ -67,9 +67,28 @@ The selected step’s largest annotated CPU span is `dataloader_wait`. HTA also 
 
 | Kernel type | total duration | percentage |
 |---|---:|---:|
-| COMPUTATION | 5200583 | 97.6 |
-| MEMORY | 130256 | 2.4 |
-| COMPUTATION overlapping MEMORY | 61 | 0.0 |
+| COMPUTATION | 5192939 | 97.6 |
+| MEMORY | 129121 | 2.4 |
+| COMPUTATION overlapping MEMORY | 48 | 0.0 |
+
+## Dominant GPU operations in the selected step
+
+| Phase | Kernel operation | Calls | Total GPU time (us) | Mean GPU time (us) | Step wall-time ratio |
+|---|---|---:|---:|---:|---:|
+| `forward` | `radius_search_limited_select_batched_2985e173_cuda_kernel_forward` | 11 | 110673.109 | 10061.192 | 12.752% |
+| `loss` | `radius_search_limited_select_batched_2985e173_cuda_kernel_forward` | 1 | 26402.984 | 26402.984 | 3.042% |
+| `dataloader_wait` | `_nearest_triangle_kernel` | 1 | 10127.274 | 10127.274 | 1.167% |
+| `backward` | `triton_poi_fused__softmax_backward_data__to_copy_add_div_expand_permute_squeeze_unsqueeze_view_2` | 9 | 7427.664 | 825.296 | 0.856% |
+| `backward` | `triton_red_fused__softmax_backward_data__to_copy_clamp_div_27` | 9 | 5983.667 | 664.852 | 0.689% |
+| `loss` | `nvjet_sm90_tst_112x128_64x7_2x1_v_bz_bias_TNN` | 48 | 5943.601 | 123.825 | 0.685% |
+| `loss` | `triton_poi_fused__softmax__to_copy_add_clamp_div_ge_mul_neg_permute_scalar_tensor_sub_transpose_` | 19 | 5576.980 | 293.525 | 0.643% |
+| `loss` | `triton_per_fused__softmax__to_copy_amax_clamp_mul_sub_view_46` | 18 | 5385.814 | 299.212 | 0.621% |
+| `loss` | `triton_poi_fused__to_copy_add_div_permute_unsqueeze_48` | 18 | 5151.352 | 286.186 | 0.594% |
+| `backward` | `nvjet_sm90_tst_256x160_64x4_1x2_h_bz_coopA_NNT` | 18 | 4351.572 | 241.754 | 0.501% |
+| `loss` | `nvjet_sm90_tst_128x256_64x4_2x1_v_bz_coopA_bias_TNN` | 19 | 4316.536 | 227.186 | 0.497% |
+| `backward` | `triton_poi_fused__softmax__to_copy_clamp_mul_sub_view_25` | 9 | 3707.577 | 411.953 | 0.427% |
+
+The phase is the annotated CPU range with the largest timestamp overlap. GPU times are summed kernel durations, so concurrent CUDA streams can make their total exceed the selected step wall time. Critical-path contribution is not shown because this table is timestamp-based; this run has no HTA critical-path breakdown to join against. The complete data is in `hta/dominant-gpu-kernels.json`.
 
 ## CPU/GPU step pipeline
 
@@ -118,4 +137,5 @@ The original baseline correctness observation passed: `validation_loss = 0.07690
 | `findings.json` | Ranked recommendation-only hotspot |
 | `phase-source-map.json` | Trace-phase to source/config mapping |
 | `source-analysis.json` | Code observation and isolated phase-2 plan |
+| `hta/dominant-gpu-kernels.json` | Phase-labeled dominant GPU-operation accounting for the selected step |
 | `hta/` | HTA tables, critical path, normalized diagram data, and SVGs |

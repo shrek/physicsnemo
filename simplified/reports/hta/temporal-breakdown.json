@@ -1,12 +1,12 @@
 [
   {
-    "compute_time(us)": 5200643.0,
-    "compute_time_pctg": 19.55,
-    "idle_time(us)": 21277800.0,
-    "idle_time_pctg": 79.97,
-    "kernel_time(us)": 26608121.0,
-    "non_compute_time(us)": 129678.0,
-    "non_compute_time_pctg": 0.49,
+    "compute_time(us)": 5192986.0,
+    "compute_time_pctg": 18.78,
+    "idle_time(us)": 22326687.0,
+    "idle_time_pctg": 80.75,
+    "kernel_time(us)": 27648156.0,
+    "non_compute_time(us)": 128483.0,
+    "non_compute_time_pctg": 0.46,
     "rank": 0
   }
 ]
