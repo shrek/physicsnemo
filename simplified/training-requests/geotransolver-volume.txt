@@ -1,7 +1,7 @@
 # GeoTransolver volume training-optimizer request (v0 TOML contract).
 # Commands are direct argv and run from the recipe working directory.
 
-objective = "Reduce GeoTransolver volume representative steady-state training-step latency at sampling_resolution=100000 while keeping validation loss within correctness_tolerance."
+objective = "Profile performance of GeoTransolver volume representative steady-state training-step latency at sampling_resolution=100000 ."
 allowed_change_paths = ["examples/cfd/external_aerodynamics/unified_external_aero_recipe/src/"]
 
 [spec]

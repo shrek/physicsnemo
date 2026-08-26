@@ -1,0 +1,9 @@
+kineto:
+  - torch-profiler
+  - torch.profiler
+dataload:
+  - dataloader
+  - dataloader_wait
+profiler:
+  - profiling
+  - trace

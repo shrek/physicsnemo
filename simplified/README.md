@@ -1,3 +1,19 @@
+# Instrumentation knowledge base
+
+The workflow includes a small, generic, evidence-backed instrumentation wiki in
+`instrumentation_wiki/`. It supplies only published, verified playbooks to the
+InstrumentationProposer and records proposal/critic/trace outcomes as
+run-local append-only memory. An agent may record an untrusted discovery, but
+only a validated manual draft can be promoted to canonical knowledge.
+
+```bash
+instrumentation-knowledge validate
+instrumentation-knowledge search "existing profiler"
+instrumentation-knowledge show playbook-explicit-pytorch-loop
+```
+
+See `instrumentation_wiki/README.md` for the page lifecycle and layout.
+
 # v0 interface notice
 
 Use [V0.md](V0.md) and [request.template.txt](request.template.txt). v0 requires a complete TOML request, validates it deterministically, and does not expose input-proposal, input-critic, or human-gate flows. The documentation below describes the retired prototype and is retained only as historical context.

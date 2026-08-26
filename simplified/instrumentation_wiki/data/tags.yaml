@@ -1,0 +1,13 @@
+tags:
+  - instrumentation
+  - pytorch
+  - kineto
+  - explicit-loop
+  - profiler
+  - profile-output
+  - dataloader
+  - device-transfer
+  - distributed
+  - hydra
+  - validation
+  - failure

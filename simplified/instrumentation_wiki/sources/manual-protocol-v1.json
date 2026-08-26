@@ -1,0 +1,5 @@
+{
+  "id": "manual-protocol-v1",
+  "kind": "maintained_contract",
+  "summary": "Initial reviewed instrumentation rules for generic PhysicsNeMo training recipes."
+}

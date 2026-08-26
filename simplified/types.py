@@ -99,6 +99,50 @@ class InstrumentationPlan(Value):
     ranges: tuple[str, ...] = Field(description="Profiler range names emitted by the patch.")
 
 
+class KnowledgeItem(Value):
+    """A versioned, human-readable instrumentation knowledge page."""
+
+    id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    kind: Literal["contract", "playbook", "failure_pattern", "recipe_profile"]
+    status: Literal["draft", "published", "deprecated"]
+    trust: Literal["observed", "verified"]
+    version: int = Field(ge=0)
+    tags: tuple[str, ...] = ()
+    applies_when: dict[str, str | bool] = Field(default_factory=dict)
+    evidence_ids: tuple[str, ...] = ()
+    body: str = ""
+
+
+class KnowledgeQuery(Value):
+    """Bounded, structured retrieval request for published wiki pages."""
+
+    text: str = ""
+    tags: tuple[str, ...] = ()
+    attributes: dict[str, str | bool] = Field(default_factory=dict)
+    limit: int = Field(default=6, ge=1, le=20)
+
+
+class MemoryItem(Value):
+    """Append-only evidence or agent observation associated with one run."""
+
+    id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    kind: Literal["agent_discovery", "proposal", "critic_result", "trace_result"]
+    trust: Literal["agent_claim", "observed", "verified"]
+    content: str = Field(min_length=1)
+    citations: tuple[str, ...] = ()
+
+
+class AgentContext(Value):
+    """Small, reproducible knowledge snapshot supplied to a proposer."""
+
+    source_fingerprint: str = Field(min_length=1)
+    knowledge_snapshot: tuple[KnowledgeItem, ...] = ()
+    memory_snapshot: tuple[MemoryItem, ...] = ()
+    retrieval_summary: str = ""
+
+
 class TraceResult(Value):
     """Machine-readable final line emitted by the profile command."""
 

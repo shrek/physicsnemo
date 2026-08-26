@@ -32,6 +32,12 @@ from simplified.environment import (
     SourceEnvironment,
     TrainingEnvironment,
 )
+from simplified.knowledge import (
+    FilesystemKnowledgeStore,
+    JsonlRunMemory,
+    KnowledgeStore,
+    RunMemory,
+)
 from simplified.types import (
     BenchmarkResult,
     CandidateResult,
@@ -205,6 +211,9 @@ class InstrumentationWorkflow(Agent):
         self.agents = agents
         self.max_attempts = max_attempts
 
+    def _record(self, kind: str, content: str, *, trust: str = "observed") -> None:
+        self.agents.context_builder.memory.record(kind, content, trust=trust)
+
     async def accept(
         self,
         spec: TrainingSpec,
@@ -212,12 +221,19 @@ class InstrumentationWorkflow(Agent):
     ) -> InstrumentationPlan:
         feedback = previous
         for _ in range(self.max_attempts):
+            context = self.agents.context_builder.build(spec, REQUIRED_RANGES, feedback)
             plan = await self.agents.instrumentation.propose(
-                spec, REQUIRED_RANGES, feedback
+                spec, REQUIRED_RANGES, feedback, context
+            )
+            self._record(
+                "proposal",
+                f"Proposed ranges={plan.ranges}; context={context.source_fingerprint}; "
+                f"knowledge={[item.id for item in context.knowledge_snapshot]}",
             )
             feedback = self.agents.instrumentation_critic.review(
                 spec, plan, REQUIRED_RANGES
             )
+            self._record("critic_result", feedback.feedback or "instrumentation accepted", trust="verified" if feedback.accepted else "observed")
             if feedback.accepted:
                 return plan
         self.failed("instrumentation", feedback)
@@ -232,8 +248,16 @@ class InstrumentationWorkflow(Agent):
         feedback = None
         if plan is None:
             for _ in range(self.max_attempts):
-                candidate = await self.agents.instrumentation.propose(
+                context = self.agents.context_builder.build(
                     request.spec, REQUIRED_RANGES, feedback
+                )
+                candidate = await self.agents.instrumentation.propose(
+                    request.spec, REQUIRED_RANGES, feedback, context
+                )
+                self._record(
+                    "proposal",
+                    f"Proposed ranges={candidate.ranges}; context={context.source_fingerprint}; "
+                    f"knowledge={[item.id for item in context.knowledge_snapshot]}",
                 )
                 feedback = self.validate_patch_scope(
                     candidate.patch, request.allowed_change_paths
@@ -242,6 +266,7 @@ class InstrumentationWorkflow(Agent):
                     feedback = self.agents.instrumentation_critic.review(
                         request.spec, candidate, REQUIRED_RANGES
                     )
+                self._record("critic_result", feedback.feedback or "instrumentation accepted", trust="verified" if feedback.accepted else "observed")
                 if feedback.accepted:
                     plan = candidate
                     if on_plan_accepted:
@@ -253,6 +278,11 @@ class InstrumentationWorkflow(Agent):
         for _ in range(self.max_attempts):
             trace = self.agents.runner.profile(request.spec, plan)
             feedback = self.agents.trace_critic.review(trace, REQUIRED_RANGES)
+            self._record(
+                "trace_result",
+                feedback.feedback or f"trace completed={trace.completed}; ranges={trace.ranges}",
+                trust="verified" if feedback.accepted else "observed",
+            )
             if feedback.accepted:
                 return plan, trace
         self.failed("trace", feedback)
@@ -582,6 +612,8 @@ class WorkflowSteps(Agent):
 
     source: Annotated[SourceEnvironment, hidden]
     environment: Annotated[TrainingEnvironment, hidden]
+    knowledge: Annotated[KnowledgeStore, hidden]
+    memory: Annotated[RunMemory, hidden]
 
     def __init__(
         self,
@@ -591,6 +623,8 @@ class WorkflowSteps(Agent):
         max_attempts: int = 3,
         run_context: RunContext | None = None,
         resume: bool = True,
+        knowledge: KnowledgeStore | None = None,
+        memory: RunMemory | None = None,
     ):
         super().__init__(llm=llm)
         if max_attempts < 1:
@@ -600,10 +634,21 @@ class WorkflowSteps(Agent):
         self.max_attempts = max_attempts
         self.run_context = run_context
         self.resume = resume
+        self.knowledge = knowledge or FilesystemKnowledgeStore()
+        memory_path = run_context.path("knowledge-memory.jsonl") if run_context else None
+        self.memory = memory or JsonlRunMemory(
+            memory_path, run_context.id if run_context else "interactive"
+        )
 
     @property
     def agents(self) -> Agents:
-        return create_agents(self._llm, self.source, self.environment)
+        return create_agents(
+            self._llm,
+            self.source,
+            self.environment,
+            knowledge=self.knowledge,
+            memory=self.memory,
+        )
 
     def _analysis_checkpoints(
         self, request: TrainingRequest
@@ -635,7 +680,7 @@ class WorkflowSteps(Agent):
     async def analyze_performance(
         self, request: TrainingRequest
     ) -> PerformanceAnalysis:
-        """Build validated performance evidence through the report boundary."""
+        """Profile performance."""
         return await PerformanceAnalysisWorkflow(
             self.agents,
             llm=self._llm,

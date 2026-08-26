@@ -14,6 +14,10 @@ dependencies = [
 
 [project.scripts]
 workflow = "simplified.workflow:main"
+instrumentation-knowledge = "simplified.knowledge:main"
+
+[tool.setuptools.package-data]
+simplified = ["instrumentation_wiki/**/*.md", "instrumentation_wiki/**/*.yaml", "instrumentation_wiki/**/*.json"]
 
 [dependency-groups]
 dev = [

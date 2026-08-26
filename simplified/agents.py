@@ -21,7 +21,15 @@ from simplified.environment import (
     SourceEnvironment,
     TrainingEnvironment,
 )
+from simplified.knowledge import (
+    ContextBuilder,
+    FilesystemKnowledgeStore,
+    JsonlRunMemory,
+    KnowledgeStore,
+    RunMemory,
+)
 from simplified.types import (
+    AgentContext,
     BenchmarkResult,
     CandidateResult,
     ChangeProposal,
@@ -30,6 +38,9 @@ from simplified.types import (
     Hotspot,
     HotspotAnalysis,
     InstrumentationPlan,
+    KnowledgeItem,
+    KnowledgeQuery,
+    MemoryItem,
     OptimizationResult,
     PerformanceReport,
     Route,
@@ -472,17 +483,50 @@ class Runner(Agent):
 
 
 class InstrumentationProposer(SourceAgent):
+    knowledge: Annotated[KnowledgeStore, hidden]
+    memory: Annotated[RunMemory, hidden]
+
+    def __init__(
+        self,
+        *,
+        knowledge: KnowledgeStore | None = None,
+        memory: RunMemory | None = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.knowledge = knowledge or FilesystemKnowledgeStore()
+        self.memory = memory or JsonlRunMemory()
+
+    def search_knowledge(self, query: str, limit: int = 6) -> tuple[KnowledgeItem, ...]:
+        """Search verified, published instrumentation guidance."""
+        return self.knowledge.search(KnowledgeQuery(text=query, limit=limit))
+
+    def record_discovery(self, observation: str) -> MemoryItem:
+        """Append an untrusted observation for later review; never edits the wiki."""
+        return self.memory.record("agent_discovery", observation, trust="agent_claim")
+
+    def create_knowledge_draft(self, draft: KnowledgeItem) -> str:
+        """Save a draft for review; this can never publish or overwrite guidance."""
+        return str(self.knowledge.create_draft(draft))
+
     @strategy(_INSTRUMENTATION_PROPOSER_STRATEGY)
     async def propose(
         self,
         spec: TrainingSpec,
         required_ranges: tuple[str, ...],
         previous: Critique | None,
+        context: AgentContext | None = None,
     ) -> InstrumentationPlan:
         """Return the smallest applicable opt-in instrumentation diff.
 
-        Resolve previous critic feedback. Inspect the requested entry point and
-        reuse its existing profiler and result-output path; do not create a
+        First consult the instrumentation wiki through `search_knowledge` using
+        terms grounded in the requested recipe (for example, its profiler,
+        framework, loop shape, or distributed mode). Use the returned verified
+        guidance to inform the plan, and use the supplied bounded context as a
+        starting index rather than a replacement for that lookup. Then inspect
+        the requested source as authoritative. Resolve previous critic feedback,
+        inspect the requested entry point, and reuse its existing profiler and
+        result-output path; do not create a
         competing profiler or output protocol. Keep normal execution and
         training semantics unchanged when profiling is disabled.
 
@@ -495,9 +539,10 @@ class InstrumentationProposer(SourceAgent):
 
         Do not apply or run the patch yourself. Return the best complete diff
         promptly; the critic performs static and runtime validation.
-        Examples under `simplified/examples/instrumentation/` illustrate
-        instrumentation patterns. They need not match the requested model or
-        recipe and never replace inspection of the supplied source.
+        Published knowledge pages may suggest patterns, but must never replace
+        inspection of the supplied source. Any discovery can be recorded only as
+        an untrusted run-memory observation; do not modify canonical knowledge.
+        Examples under `simplified/examples/instrumentation/` remain illustrative.
         """
         ...
 
@@ -650,6 +695,7 @@ class ReportBuilder(Agent):
 class Agents:
     runner: Runner
     instrumentation: InstrumentationProposer
+    context_builder: ContextBuilder
     instrumentation_critic: InstrumentationCritic
     trace_critic: TraceCritic
     hotspots: HotspotAnalyzer
@@ -663,10 +709,18 @@ def create_agents(
     llm: UnifiedLLM,
     source: SourceEnvironment,
     environment: TrainingEnvironment,
+    *,
+    knowledge: KnowledgeStore | None = None,
+    memory: RunMemory | None = None,
 ) -> Agents:
+    knowledge = knowledge or FilesystemKnowledgeStore()
+    memory = memory or JsonlRunMemory()
     return Agents(
         runner=Runner(llm=llm, environment=environment),
-        instrumentation=InstrumentationProposer(llm=llm, source=source),
+        instrumentation=InstrumentationProposer(
+            llm=llm, source=source, knowledge=knowledge, memory=memory
+        ),
+        context_builder=ContextBuilder(knowledge, memory),
         instrumentation_critic=InstrumentationCritic(
             llm=llm, environment=environment
         ),
